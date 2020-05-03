@@ -47,5 +47,13 @@
     <ClInclude Include="ia32.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Vmx.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <MASM Include="Intrinsics.asm">
+      <Filter>Source Files</Filter>
+    </MASM>
   </ItemGroup>
 </Project>
