@@ -14,7 +14,9 @@ typedef struct _LOCAL_VMM_CONTEXT
 	BOOLEAN VmxLaunched;
 	PVMXON_REGION pVmxOn;
 	PVMCS pVmcs;
-	MISC_REGISTER_STATE MiscRegisterContext;
+	PHYSICAL_ADDRESS PhysVmxOn;
+	PHYSICAL_ADDRESS PhysVmcs;
+	MISC_REGISTER_CONTEXT MiscRegisterContext;
 	REGISTER_CONTEXT RegisterContext;
 } LOCAL_VMM_CONTEXT, *PLOCAL_VMM_CONTEXT;
 
@@ -24,10 +26,6 @@ typedef struct _GLOBAL_VMM_CONTEXT
 	PLOCAL_VMM_CONTEXT pLocalContexts;
 	ULONG64 SystemCr3;
 } GLOBAL_VMM_CONTEXT, *PGLOBAL_VMM_CONTEXT;
-
-NTSTATUS 
-VmxInitialise (
-);
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_min_(DISPATCH_LEVEL)
@@ -60,9 +58,3 @@ VmxSetupVmcs (
 	_In_ ULONG_PTR GuestRip,
 	_In_ ULONG_PTR GuestRsp
 );
-
-VOID
-VmxWrite(
-    SIZE_T VmxField,
-    SIZE_T Value
-)

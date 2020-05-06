@@ -148,9 +148,9 @@ typedef union
      * @brief Numeric Error
      *
      * [Bit 5] Enables the native (internal) mechanism for reporting x87 FPU errors when set; enables the PC-style x87 FPU
-     * error reporting mechanism when clear. When the NE flag is clear and the IGNNE\# input is asserted, x87 FPU errors are
-     * ignored. When the NE flag is clear and the IGNNE\# input is deasserted, an unmasked x87 FPU error causes the processor
-     * to assert the FERR\# pin to generate an external interrupt and to stop instruction execution immediately before
+     * error reporting mechanism when clear. When the NE flag is clear and the IGNNE\# input is ASSERTed, x87 FPU errors are
+     * ignored. When the NE flag is clear and the IGNNE\# input is deASSERTed, an unmasked x87 FPU error causes the processor
+     * to ASSERT the FERR\# pin to generate an external interrupt and to stop instruction execution immediately before
      * executing the next waiting floating-point instruction or WAIT/FWAIT instruction.
      * The FERR\# pin is intended to drive an input to an external interrupt controller (the FERR\# pin emulates the ERROR\#
      * pin of the Intel 287 and Intel 387 DX math coprocessors). The NE flag, IGNNE\# pin, and FERR\# pin are used with
@@ -1820,7 +1820,7 @@ typedef struct
        * @brief Pending Break Enable
        *
        * [Bit 31] The processor supports the use of the FERR\#/PBE\# pin when the processor is in the stop-clock state (STPCLK\#
-       * is asserted) to signal the processor that an interrupt is pending and that the processor should return to normal
+       * is ASSERTed) to signal the processor that an interrupt is pending and that the processor should return to normal
        * operation to handle the interrupt. Bit 10 (PBE enable) in the IA32_MISC_ENABLE MSR enables this capability.
        */
       UINT32 PendingBreakEnable                                    : 1;
@@ -6529,7 +6529,7 @@ typedef union
      * @note Once the Lock bit is set, the contents of this register cannot be modified. Therefore the lock bit must be set
      *       after configuring support for Intel Virtualization Technology and prior to transferring control to an option ROM or the
      *       OS. Hence, once the Lock bit is set, the entire IA32_FEATURE_CONTROL contents are preserved across RESET when PWRGOOD is
-     *       not deasserted.
+     *       not deASSERTed.
      * @remarks If any one enumeration condition for defined bit field position greater than bit 0 holds.
      */
     UINT64 LockBit                                                 : 1;
@@ -9425,21 +9425,27 @@ typedef union
  * @remarks If CPUID.0AH: EAX[7:0] > 0
  */
 #define IA32_PERF_GLOBAL_CTRL                                        0x0000038F
-typedef struct
+typedef union
 {
-  /**
-   * EN_PMC(n). Enable bitmask. Only the first n-1 bits are valid. Bits 31:n are reserved.
-   *
-   * @remarks If CPUID.0AH: EAX[15:8] > n
-   */
-  UINT32 EnPmcn;
+    struct
+    {
 
-  /**
-   * EN_FIXED_CTR(n). Enable bitmask. Only the first n-1 bits are valid. Bits 31:n are reserved.
-   *
-   * @remarks If CPUID.0AH: EDX[4:0] > n
-   */
-  UINT32 EnFixedCtrn;
+        /**
+         * EN_PMC(n). Enable bitmask. Only the first n-1 bits are valid. Bits 31:n are reserved.
+         *
+         * @remarks If CPUID.0AH: EAX[15:8] > n
+         */
+        UINT32 EnPmcn;
+
+        /**
+         * EN_FIXED_CTR(n). Enable bitmask. Only the first n-1 bits are valid. Bits 31:n are reserved.
+         *
+         * @remarks If CPUID.0AH: EDX[4:0] > n
+         */
+        UINT32 EnFixedCtrn;
+    };
+
+    UINT64 Flags;
 } IA32_PERF_GLOBAL_CTRL_REGISTER;
 
 
@@ -12040,7 +12046,7 @@ typedef union
      * - 0: ADDR0 range unused.
      * - 1: The [IA32_RTIT_ADDR0_A..IA32_RTIT_ADDR0_B] range defines a FilterEn range. FilterEn will only be set when the IP is
      * within this range, though other FilterEn ranges can additionally be used.
-     * - 2: The [IA32_RTIT_ADDR0_A..IA32_RTIT_ADDR0_B] range defines a TraceStop range. TraceStop will be asserted if code
+     * - 2: The [IA32_RTIT_ADDR0_A..IA32_RTIT_ADDR0_B] range defines a TraceStop range. TraceStop will be ASSERTed if code
      * branches into this range.
      * - 3..15: Reserved (\#GP).
      *
@@ -12061,7 +12067,7 @@ typedef union
      * - 0: ADDR1 range unused.
      * - 1: The [IA32_RTIT_ADDR1_A..IA32_RTIT_ADDR1_B] range defines a FilterEn range. FilterEn will only be set when the IP is
      * within this range, though other FilterEn ranges can additionally be used.
-     * - 2: The [IA32_RTIT_ADDR1_A..IA32_RTIT_ADDR1_B] range defines a TraceStop range. TraceStop will be asserted if code
+     * - 2: The [IA32_RTIT_ADDR1_A..IA32_RTIT_ADDR1_B] range defines a TraceStop range. TraceStop will be ASSERTed if code
      * branches into this range.
      * - 3..15: Reserved (\#GP).
      *
@@ -12082,7 +12088,7 @@ typedef union
      * - 0: ADDR2 range unused.
      * - 1: The [IA32_RTIT_ADDR2_A..IA32_RTIT_ADDR2_B] range defines a FilterEn range. FilterEn will only be set when the IP is
      * within this range, though other FilterEn ranges can additionally be used.
-     * - 2: The [IA32_RTIT_ADDR2_A..IA32_RTIT_ADDR2_B] range defines a TraceStop range. TraceStop will be asserted if code
+     * - 2: The [IA32_RTIT_ADDR2_A..IA32_RTIT_ADDR2_B] range defines a TraceStop range. TraceStop will be ASSERTed if code
      * branches into this range.
      * - 3..15: Reserved (\#GP).
      *
@@ -12103,7 +12109,7 @@ typedef union
      * - 0: ADDR3 range unused.
      * - 1: The [IA32_RTIT_ADDR3_A..IA32_RTIT_ADDR3_B] range defines a FilterEn range. FilterEn will only be set when the IP is
      * within this range, though other FilterEn ranges can additionally be used.
-     * - 2: The [IA32_RTIT_ADDR3_A..IA32_RTIT_ADDR3_B] range defines a TraceStop range. TraceStop will be asserted if code
+     * - 2: The [IA32_RTIT_ADDR3_A..IA32_RTIT_ADDR3_B] range defines a TraceStop range. TraceStop will be ASSERTed if code
      * branches into this range.
      * - 3..15: Reserved (\#GP).
      *
@@ -12974,7 +12980,7 @@ typedef union
     /**
      * @brief Lock <b>(R/W)</b>
      *
-     * [Bit 30] If 1, locks any further change to the MSR. The lock bit is set automatically on the first SMI assertion even if
+     * [Bit 30] If 1, locks any further change to the MSR. The lock bit is set automatically on the first SMI ASSERTion even if
      * not explicitly set by BIOS. Default is 0.
      *
      * @remarks If CPUID.01H:ECX.[11] = 1
@@ -15569,7 +15575,7 @@ typedef struct
    * Base address field (32:63); see description of $BASE_LOW for more details.
    */
   UINT32 MustBeZero;
-} SEGMENT_DESCRIPTOR_64;
+} SEGMENT_DESCRIPTOR_64, *PSEGMENT_DESCRIPTOR_64;
 
 #define SEGMENT_DESCRIPTOR_TYPE_SYSTEM                               0x00000000
 #define SEGMENT_DESCRIPTOR_TYPE_CODE_OR_DATA                         0x00000001

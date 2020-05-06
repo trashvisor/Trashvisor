@@ -16,7 +16,7 @@ NTSTATUS DriverEntry (
     if (!NT_SUCCESS(AllocateVmmMemory(&GlobalVmmContext)))
         goto Exit;
 
-    assert(GlobalVmmContext != NULL);
+    ASSERT(GlobalVmmContext != NULL);
 
     KeGenericCallDpc(VmxBroadcastInit, GlobalVmmContext);
 Exit:

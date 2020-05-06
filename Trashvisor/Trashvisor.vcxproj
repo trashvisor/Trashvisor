@@ -117,6 +117,8 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
+    <RunCodeAnalysis>true</RunCodeAnalysis>
+    <Inf2CatUseLocalTime>true</Inf2CatUseLocalTime>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
@@ -133,6 +135,16 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
   </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <TreatWarningAsError>false</TreatWarningAsError>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <TreatWarningAsError>false</TreatWarningAsError>
+    </ClCompile>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <Inf Include="Trashvisor.inf" />
   </ItemGroup>
@@ -142,17 +154,19 @@
   <ItemGroup>
     <ClCompile Include="ArchUtils.c" />
     <ClCompile Include="Entry.c" />
+    <ClCompile Include="VmxCore.c" />
     <ClCompile Include="VmxUtils.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ArchUtils.h" />
     <ClInclude Include="Header.h" />
     <ClInclude Include="ia32.h" />
-    <ClInclude Include="Vmx.h" />
+    <ClInclude Include="VmxCore.h" />
     <ClInclude Include="VmxUtils.h" />
   </ItemGroup>
   <ItemGroup>
     <MASM Include="Intrinsics.asm" />
+    <MASM Include="VmxAsm.asm" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

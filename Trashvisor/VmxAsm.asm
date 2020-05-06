@@ -1,5 +1,7 @@
 .code
 
+extern VmxInitialiseLogicalProcessor:proc
+
 VmxInitialiseLogicalProcessorStub PROC
 
 	mov rdx, SuccessTarget

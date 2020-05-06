@@ -1,7 +1,6 @@
 #pragma once
 #include <ntddk.h>
 #include <intrin.h>
-#include <assert.h>
 #include <stdarg.h>
 #include "ia32.h"
 

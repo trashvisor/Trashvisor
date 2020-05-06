@@ -1,10 +1,10 @@
-#pragma once
 #include "ArchUtils.h"
+#include "VmxUtils.h"
 
 _Use_decl_annotations_
 VOID
-CaptureRequiredGuestState(
-    PMISC_REGISTER_STATE pMiscRegisterState
+CaptureRequiredGuestState (
+    PMISC_REGISTER_CONTEXT pMiscRegisterState
 )
 {
     pMiscRegisterState->Cr0.Flags = ReadControlRegister(0);
@@ -26,8 +26,61 @@ CaptureRequiredGuestState(
     pMiscRegisterState->SysEnterCsMsr.Flags = ReadMsr(IA32_SYSENTER_CS);
     pMiscRegisterState->SysEnterEipMsr = ReadMsr(IA32_SYSENTER_EIP);
     pMiscRegisterState->SysEnterEspMsr = ReadMsr(IA32_SYSENTER_ESP);
+    pMiscRegisterState->PerfGlobalCtrlMsr.Flags = ReadMsr(IA32_PERF_GLOBAL_CTRL);
 
     return;
+}
+
+_Use_decl_annotations_
+SEGMENT_DESCRIPTOR_64 
+GetDescriptorFromSelector (
+    SEGMENT_SELECTOR Selector,
+    SEGMENT_DESCRIPTOR_REGISTER_64 Gdtr
+)
+{
+    SEGMENT_DESCRIPTOR_64 Desc = *(PSEGMENT_DESCRIPTOR_64)(Gdtr.BaseAddress + (Selector.Index << 3));
+    return Desc;
+}
+
+_Use_decl_annotations_
+UINT32
+GetBaseFromSegDescriptor (
+    SEGMENT_DESCRIPTOR_64 Descriptor
+)
+{
+    return (Descriptor.BaseAddressHigh << 24 
+        | Descriptor.BaseAddressMiddle << 16 
+        | Descriptor.BaseAddressLow);
+}
+
+_Use_decl_annotations_
+UINT32
+GetLimitFromSegDescriptor (
+    SEGMENT_DESCRIPTOR_64 Descriptor
+)
+{
+    return (Descriptor.SegmentLimitHigh << 16 | Descriptor.SegmentLimitLow);
+}
+
+_Use_decl_annotations_
+VMCS_GUEST_ACCESS_RIGHTS
+GetAccessRightsFromSegDescriptor (
+    SEGMENT_DESCRIPTOR_64 Descriptor
+)
+{
+    VMCS_GUEST_ACCESS_RIGHTS AccessRights;
+    
+    AccessRights.SegmentType = Descriptor.Type;
+    AccessRights.DescriptorType = Descriptor.DescriptorType;
+    AccessRights.DPL = Descriptor.DescriptorPrivilegeLevel;
+    AccessRights.Present = Descriptor.Present;
+    AccessRights.AVL = Descriptor.System;
+    AccessRights.Long = Descriptor.LongMode;
+    AccessRights.DefaultOpSize = Descriptor.DefaultBig;
+    AccessRights.Granularity = Descriptor.Granularity;
+    AccessRights.SegmentUnusable = 0;
+   
+    return AccessRights;
 }
 
 _Use_decl_annotations_
@@ -57,7 +110,7 @@ Cpuid (
 )
 {
     if (pCpuidOut == NULL)
-        assert(FALSE);
+        ASSERT(FALSE);
 
     __cpuid(pCpuidOut, CpuidIndex);
 }
@@ -80,7 +133,7 @@ WriteControlRegister (
     case 8:
         __writecr8(Value);
     default:
-        assert(FALSE);
+        ASSERT(FALSE);
     }
 }
 
@@ -101,27 +154,59 @@ ReadControlRegister (
     case 4:
         return __readcr4();
     default:
-        assert(FALSE);
+        ASSERT(FALSE);
     }
 }
 
 _Use_decl_annotations_
 ULONGLONG
 ReadDebugRegister (
-    _In_ INT32 DebugRegister
+    CONST UINT32 DebugRegister
 )
 {
-    return __readdr(DebugRegister);
+    switch (DebugRegister)
+    {
+    case 0:
+        return __readdr(0);
+    case 1:
+        return __readdr(1);
+    case 2:
+        return __readdr(2);
+    case 3:
+        return __readdr(3);
+    case 6:
+        return __readdr(6);
+    case 7:
+        return __readdr(7);
+    default:
+        ASSERT(FALSE);
+    }
 }
 
 _Use_decl_annotations_
 VOID
 WriteDebugRegister (
-    INT32 DebugRegister,
+    UINT32 DebugRegister,
     ULONGLONG Value
 )
 {
-	__writedr(DebugRegister, Value);
+    switch (DebugRegister)
+    {
+    case 0:
+        __writedr(0, Value);
+    case 1:
+        __writedr(1, Value);
+    case 2:
+        __writedr(2, Value);
+    case 3:
+        __writedr(3, Value);
+    case 6:
+        __writedr(6, Value);
+    case 7:
+        __writedr(7, Value);
+    default:
+        ASSERT(FALSE);
+    }
 }
 
 _Use_decl_annotations_

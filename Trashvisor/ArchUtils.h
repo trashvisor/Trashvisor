@@ -1,6 +1,8 @@
 #pragma once
 #include "Header.h"
 
+typedef SEGMENT_DESCRIPTOR_REGISTER_64* PSEGMENT_DESCRIPTOR_REGISTER_64;
+
 typedef struct _REGISTER_CONTEXT
 {
     UINT64 P1Home;
@@ -13,12 +15,12 @@ typedef struct _REGISTER_CONTEXT
     UINT32 ContextFlags;
     UINT32 MxCsr;
 
-    UINT16 SegCs;
-    UINT16 SegDs;
-    UINT16 SegEs;
-    UINT16 SegFs;
-    UINT16 SegGs;
-    UINT16 SegSs;
+    SEGMENT_SELECTOR SegCs;
+    SEGMENT_SELECTOR SegDs;
+    SEGMENT_SELECTOR SegEs;
+    SEGMENT_SELECTOR SegFs;
+    SEGMENT_SELECTOR SegGs;
+    SEGMENT_SELECTOR SegSs;
     UINT32 EFlags;
 
     UINT64 Dr0;
@@ -105,16 +107,57 @@ typedef struct _MISC_REGISTER_CONTEXT
     // IA32_S_CET
     // IA32_INTERRUPT_SSP_TABLE_ADDR
     // Doesn't matter. Processor doesn't support em
-} MISC_REGISTER_STATE, *PMISC_REGISTER_STATE;
+} MISC_REGISTER_CONTEXT, *PMISC_REGISTER_CONTEXT;
+
+typedef union _VMCS_GUEST_ACCESS_RIGHTS
+{
+    struct
+    {
+        UINT64 SegmentType : 4;
+        UINT64 DescriptorType : 1;
+        UINT64 DPL : 2;
+        UINT64 Present : 1;
+        UINT64 Reserved : 4;
+        UINT64 AVL : 1;
+        UINT64 Long : 1;
+        UINT64 DefaultOpSize : 1;
+        UINT64 Granularity : 1;
+        UINT64 SegmentUnusable : 1;
+        UINT64 Reserved2 : 15;
+    };
+
+    UINT32 Flags;
+} VMCS_GUEST_ACCESS_RIGHTS, *PVMCS_GUEST_ACCESS_RIGHTS;
 
 VOID
-CaptureRequiredGuestState(
+CaptureRequiredGuestState (
     _Out_ PREGISTER_STATE 
 );
 
 VOID
-CaptureRegisterContext(
+CaptureRegisterContext (
     _Out_ PREGISTER_CONTEXT
+);
+
+SEGMENT_DESCRIPTOR_64
+GetDescriptorFromSelector (
+    _In_ SEGMENT_SELECTOR Selector,
+    _In_ SEGMENT_DESCRIPTOR_REGISTER_64 Gdtr
+);
+
+UINT32
+GetBaseFromSegDescriptor (
+    _In_ SEGMENT_DESCRIPTOR_64 Descriptor
+);
+
+UINT32
+GetLimitFromSegDescriptor (
+    _In_ SEGMENT_DESCRIPTOR_64 Descriptor
+);
+
+VMCS_GUEST_ACCESS_RIGHTS
+GetAccessRightsFromSegDescriptor (
+    _In_ SEGMENT_DESCRIPTOR_64 Descriptor
 );
 
 ULONGLONG
@@ -147,12 +190,12 @@ WriteControlRegister (
 
 ULONGLONG
 ReadDebugRegister (
-    _In_ INT32 DebugRegister
+    _In_ UINT32 DebugRegister
 );
 
 VOID
 WriteDebugRegister (
-    _In_ INT32 DebugRegister,
+    _In_ UINT32 DebugRegister,
     _In_ ULONGLONG Value
 );
 

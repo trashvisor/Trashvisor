@@ -33,6 +33,9 @@
     <ClCompile Include="ArchUtils.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="VmxCore.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Header.h">
@@ -47,12 +50,15 @@
     <ClInclude Include="ia32.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Vmx.h">
+    <ClInclude Include="VmxCore.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <MASM Include="Intrinsics.asm">
+      <Filter>Source Files</Filter>
+    </MASM>
+    <MASM Include="VmxAsm.asm">
       <Filter>Source Files</Filter>
     </MASM>
   </ItemGroup>
