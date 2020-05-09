@@ -3,7 +3,7 @@
 
 _Use_decl_annotations_
 VOID
-CaptureRequiredGuestState (
+CaptureMiscRegisterContext (
     PMISC_REGISTER_CONTEXT pMiscRegisterState
 )
 {
@@ -16,8 +16,8 @@ CaptureRequiredGuestState (
     _sgdt(&pMiscRegisterState->Gdtr.Limit);
     __sidt(&pMiscRegisterState->Idtr.Limit);
 
-    _str(&pMiscRegisterState->Tr);
-    _sldt(&pMiscRegisterState->Ldtr);
+    _str(&pMiscRegisterState->Tr.Flags);
+    _sldt(&pMiscRegisterState->Ldtr.Flags);
 
     pMiscRegisterState->DebugCtlMsr.Flags = ReadMsr(IA32_DEBUGCTL);
     pMiscRegisterState->PatMsr.Flags = ReadMsr(IA32_PAT);
@@ -27,8 +27,6 @@ CaptureRequiredGuestState (
     pMiscRegisterState->SysEnterEipMsr = ReadMsr(IA32_SYSENTER_EIP);
     pMiscRegisterState->SysEnterEspMsr = ReadMsr(IA32_SYSENTER_ESP);
     pMiscRegisterState->PerfGlobalCtrlMsr.Flags = ReadMsr(IA32_PERF_GLOBAL_CTRL);
-
-    return;
 }
 
 _Use_decl_annotations_

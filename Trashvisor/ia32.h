@@ -19033,7 +19033,7 @@ typedef struct
    * @see Vol3D[A.1(BASIC VMX INFORMATION)]
    */
   UINT8 Data[4088];
-} VMCS;
+} VMCS, *PVMCS;
 
 /**
  * @brief Format of the VMXON Region

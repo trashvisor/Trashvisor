@@ -2,19 +2,28 @@
 #include "Header.h"
 #include "VmxCore.h"
 
+_Check_return_
 NTSTATUS
 GetVmxCapability (
 );
 
+_Check_return_
 NTSTATUS
 AllocateVmmMemory (
     _Inout_ PGLOBAL_VMM_CONTEXT* ppGlobalVmmContext
 );
 
+_Check_return_
 PLOCAL_VMM_CONTEXT
 GetLocalVmmContext (
     _In_ PGLOBAL_VMM_CONTEXT pGlobalVmmContext,
     _In_ ULONG ProcessorIndex
+);
+
+UINT32
+RetrieveAllowedControls (
+    _In_ UINT64 ControlFlags,
+    _In_ UINT32 ControlsToSet
 );
 
 VOID

@@ -73,7 +73,7 @@ AllocateVmmMemory (
     pGlobalVmmContext->SystemCr3 = ReadControlRegister(3);
     
     pGlobalVmmContext->pLocalContexts = MmAllocateContiguousMemory(
-        sizeof(LOCAL_VMM_CONTEXT) * (*ppGlobalVmmContext)->TotalProcessorCount,
+        sizeof(LOCAL_VMM_CONTEXT) * pGlobalVmmContext->TotalProcessorCount,
         PA
     );
 
@@ -140,6 +140,26 @@ GetLocalVmmContext (
         pLocalContext++;
 
     return pLocalContext;
+}
+
+_Use_decl_annotations_
+UINT32
+RetrieveAllowedControls (
+    UINT64 ControlFlag,
+    UINT32 ControlsToSet
+)
+{
+    UINT32 AllowedControls = 0;
+    UINT32 Allowed1Controls = (ControlFlag >> 32);
+    UINT32 Allowed0Controls = (ControlFlag & 0xffffffff);
+
+    // Confirm that none of ControlsToSet are in the allowed 1 controls
+    ASSERT((ControlsToSet & Allowed1Controls) == ControlsToSet);
+
+    AllowedControls |= Allowed0Controls;
+    AllowedControls &= Allowed1Controls;
+
+    return AllowedControls;
 }
 
 _Use_decl_annotations_

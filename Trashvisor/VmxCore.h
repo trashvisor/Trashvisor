@@ -7,8 +7,6 @@ typedef struct _VMXON_REGION
 	ULONG VmcsIdentifier;
 } VMXON_REGION, *PVMXON_REGION;
 
-typedef struct VMCS* PVMCS;
-
 typedef struct _LOCAL_VMM_CONTEXT
 {
 	BOOLEAN VmxLaunched;
@@ -52,7 +50,7 @@ VmxInitialiseLogicalProcessor (
 	_In_ ULONG_PTR GuestRsp
 );
 
-NTSTATUS
+VOID
 VmxSetupVmcs (
 	_In_ PLOCAL_VMM_CONTEXT pLocalVmmContext,
 	_In_ ULONG_PTR GuestRip,
