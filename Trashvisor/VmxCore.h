@@ -2,6 +2,10 @@
 #include "Header.h"
 #include "ArchUtils.h"
 
+#define HOST_SELECTOR_RPL_MASK 0x3
+
+typedef struct _GLOBAL_VMM_CONTEXT GLOBAL_VMM_CONTEXT, *PGLOBAL_VMM_CONTEXT;
+
 typedef struct _VMXON_REGION
 {
 	ULONG VmcsIdentifier;
@@ -16,13 +20,14 @@ typedef struct _LOCAL_VMM_CONTEXT
 	PHYSICAL_ADDRESS PhysVmcs;
 	MISC_REGISTER_CONTEXT MiscRegisterContext;
 	REGISTER_CONTEXT RegisterContext;
+	PGLOBAL_VMM_CONTEXT pGlobalVmmContext;
 } LOCAL_VMM_CONTEXT, *PLOCAL_VMM_CONTEXT;
 
 typedef struct _GLOBAL_VMM_CONTEXT
 {
 	UINT32 TotalProcessorCount;
 	PLOCAL_VMM_CONTEXT pLocalContexts;
-	ULONG64 SystemCr3;
+	CR3 SystemCr3;
 } GLOBAL_VMM_CONTEXT, *PGLOBAL_VMM_CONTEXT;
 
 _IRQL_requires_max_(DISPATCH_LEVEL)

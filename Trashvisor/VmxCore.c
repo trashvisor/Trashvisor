@@ -13,6 +13,8 @@ VmxBroadcastInit (
 {
 	PGLOBAL_VMM_CONTEXT pGlobalVmmContext = (PGLOBAL_VMM_CONTEXT)DeferredContext;
 
+	ASSERT(pGlobalVmmContext != NULL);
+
 	ULONG CurrentProcessorIndex = KeGetCurrentProcessorIndex();
 
 	PLOCAL_VMM_CONTEXT pCurrentVmmContext = GetLocalVmmContext(
@@ -54,8 +56,9 @@ VmxInitialiseLogicalProcessor (
 	NTSTATUS Status = STATUS_SUCCESS;
 
 	// Enable CR4.VmxE
-	WriteControlRegister(4, ReadControlRegister(4) | CR4_VMX_ENABLE_BIT);
-	ASSERT(ReadControlRegister(4) & CR4_VMX_ENABLE_BIT);
+	__debugbreak();
+	WriteControlRegister(4, ReadControlRegister(4) | CR4_VMX_ENABLE_FLAG);
+	ASSERT(ReadControlRegister(4) & CR4_VMX_ENABLE_FLAG);
 
     // Set fixed CR0 and CR4 bits (fucking stupid) 
     ULONGLONG Cr0Fixed0 = ReadMsr(IA32_VMX_CR0_FIXED0);
@@ -66,17 +69,21 @@ VmxInitialiseLogicalProcessor (
     WriteControlRegister(0, ReadControlRegister(0) | Cr0Fixed0);
     WriteControlRegister(0, ReadControlRegister(0) & Cr0Fixed1);
 
-    WriteControlRegister(4, ReadControlRegister(4) | Cr0Fixed0);
-    WriteControlRegister(4, ReadControlRegister(4) & Cr0Fixed1);
+    WriteControlRegister(4, ReadControlRegister(4) | Cr4Fixed0);
+    WriteControlRegister(4, ReadControlRegister(4) & Cr4Fixed1);
+
+	//__debugbreak();
 	
 	if (VmxOn(&pLocalVmmContext->PhysVmxOn))
 	{
+		Status = STATUS_UNSUCCESSFUL;
 		KdPrintError("VmxOn failed.\n");
 		goto Exit;
 	}
 
 	if (VmxVmClear(&pLocalVmmContext->PhysVmcs))
 	{
+		Status = STATUS_UNSUCCESSFUL;
 		KdPrintError("VmxVmClear failed.\n");
 		VmxVmOff();
 		goto Exit;
@@ -84,8 +91,20 @@ VmxInitialiseLogicalProcessor (
 
 	if (VmxVmPtrLd(&pLocalVmmContext->PhysVmcs))
 	{
+		Status = STATUS_UNSUCCESSFUL;
 		KdPrintError("VmxVmPtrLd failed.\n");
 		VmxVmOff();
+		goto Exit;
+	}
+
+	VmxSetupVmcs(pLocalVmmContext, GuestRip, GuestRsp);
+
+	if (VmxVmLaunch())
+	{
+		SIZE_T InstructionError;
+		VmxVmRead(VMCS_VM_INSTRUCTION_ERROR, &InstructionError);
+		KdPrintError("Failed to launch: 0x%llx\n", InstructionError);
+		Status = STATUS_UNSUCCESSFUL;
 		goto Exit;
 	}
 
@@ -202,19 +221,19 @@ VmxSetupVmcs (
 
 	// Host-state area
 	VmxVmWrite(VMCS_HOST_CR0, pMiscRegisterContext->Cr0.Flags);
-	VmxVmWrite(VMCS_HOST_CR3, pMiscRegisterContext->Cr3.Flags);
+	VmxVmWrite(VMCS_HOST_CR3, pLocalVmmContext->pGlobalVmmContext->SystemCr3.Flags);
 	VmxVmWrite(VMCS_HOST_CR4, pMiscRegisterContext->Cr4.Flags);
 
 	VmxVmWrite(VMCS_HOST_RSP, GuestRsp);
 	VmxVmWrite(VMCS_HOST_RIP, GuestRip);
 
-	VmxVmWrite(VMCS_HOST_CS_SELECTOR, pLocalVmmContext->RegisterContext.SegCs.Flags);
-	VmxVmWrite(VMCS_HOST_DS_SELECTOR, pLocalVmmContext->RegisterContext.SegDs.Flags);
-	VmxVmWrite(VMCS_HOST_ES_SELECTOR, pLocalVmmContext->RegisterContext.SegEs.Flags);
-	VmxVmWrite(VMCS_HOST_FS_SELECTOR, pLocalVmmContext->RegisterContext.SegFs.Flags);
-	VmxVmWrite(VMCS_HOST_GS_SELECTOR, pLocalVmmContext->RegisterContext.SegGs.Flags);
-	VmxVmWrite(VMCS_HOST_SS_SELECTOR, pLocalVmmContext->RegisterContext.SegSs.Flags);
-	VmxVmWrite(VMCS_HOST_TR_SELECTOR, pLocalVmmContext->MiscRegisterContext.Tr.Flags);
+	VmxVmWrite(VMCS_HOST_CS_SELECTOR, pLocalVmmContext->RegisterContext.SegCs.Flags & ~HOST_SELECTOR_RPL_MASK);
+	VmxVmWrite(VMCS_HOST_DS_SELECTOR, pLocalVmmContext->RegisterContext.SegDs.Flags & ~HOST_SELECTOR_RPL_MASK);
+	VmxVmWrite(VMCS_HOST_ES_SELECTOR, pLocalVmmContext->RegisterContext.SegEs.Flags & ~HOST_SELECTOR_RPL_MASK);
+	VmxVmWrite(VMCS_HOST_FS_SELECTOR, pLocalVmmContext->RegisterContext.SegFs.Flags & ~HOST_SELECTOR_RPL_MASK);
+	VmxVmWrite(VMCS_HOST_GS_SELECTOR, pLocalVmmContext->RegisterContext.SegGs.Flags & ~HOST_SELECTOR_RPL_MASK);
+	VmxVmWrite(VMCS_HOST_SS_SELECTOR, pLocalVmmContext->RegisterContext.SegSs.Flags & ~HOST_SELECTOR_RPL_MASK);
+	VmxVmWrite(VMCS_HOST_TR_SELECTOR, pLocalVmmContext->MiscRegisterContext.Tr.Flags & ~HOST_SELECTOR_RPL_MASK);
 
 	VmxVmWrite(VMCS_HOST_FS_BASE, GetBaseFromSegDescriptor(SegFsDescriptor));
 	VmxVmWrite(VMCS_HOST_GS_BASE, GetBaseFromSegDescriptor(SegGsDescriptor));
@@ -255,21 +274,22 @@ VmxSetupVmcs (
 
 	UINT32 PinbasedCtlsToSet = 0;
 
-	UINT32 ProcbasedCtlsToSet = IA32_VMX_PROCBASED_CTLS_RDTSC_EXITING_BIT
-		| IA32_VMX_PROCBASED_CTLS_MOV_DR_EXITING_BIT
-		| IA32_VMX_PROCBASED_CTLS_ACTIVATE_SECONDARY_CONTROLS_BIT;
+	UINT32 ProcbasedCtlsToSet = IA32_VMX_PROCBASED_CTLS_RDTSC_EXITING_FLAG
+		| IA32_VMX_PROCBASED_CTLS_MOV_DR_EXITING_FLAG
+		| IA32_VMX_PROCBASED_CTLS_ACTIVATE_SECONDARY_CONTROLS_FLAG;
 
-	UINT32 ProcbasedCtrls2ToSet = IA32_VMX_PROCBASED_CTLS2_RDRAND_EXITING_BIT
-		| IA32_VMX_PROCBASED_CTLS2_RDSEED_EXITING_BIT
-		| IA32_VMX_PROCBASED_CTLS2_ENABLE_VM_FUNCTIONS_BIT
-		| IA32_VMX_PROCBASED_CTLS2_CONCEAL_VMX_FROM_PT_BIT
-		| IA32_VMX_PROCBASED_CTLS2_ENABLE_RDTSCP_BIT;
+	// Apparently hide from PT isn't supported by my processor? Ok then...
+	UINT32 ProcbasedCtrls2ToSet = IA32_VMX_PROCBASED_CTLS2_RDRAND_EXITING_FLAG
+		| IA32_VMX_PROCBASED_CTLS2_RDSEED_EXITING_FLAG
+		| IA32_VMX_PROCBASED_CTLS2_ENABLE_VM_FUNCTIONS_FLAG
+		| IA32_VMX_PROCBASED_CTLS2_ENABLE_RDTSCP_FLAG;
+		//| IA32_VMX_PROCBASED_CTLS2_CONCEAL_VMX_FROM_PT_FLAG
 
-	UINT32 VmExitCtlsToSet = IA32_VMX_EXIT_CTLS_HOST_ADDRESS_SPACE_SIZE_BIT
-		| IA32_VMX_EXIT_CTLS_CONCEAL_VMX_FROM_PT_BIT;
+	UINT32 VmExitCtlsToSet = IA32_VMX_EXIT_CTLS_HOST_ADDRESS_SPACE_SIZE_FLAG;
+		//| IA32_VMX_EXIT_CTLS_CONCEAL_VMX_FROM_PT_FLAG;
 
-	UINT32 VmEntryCtlsToSet = IA32_VMX_ENTRY_CTLS_IA32E_MODE_GUEST_BIT
-		| IA32_VMX_ENTRY_CTLS_CONCEAL_VMX_FROM_PT_BIT;
+	UINT32 VmEntryCtlsToSet = IA32_VMX_ENTRY_CTLS_IA32E_MODE_GUEST_FLAG;
+		//| IA32_VMX_ENTRY_CTLS_CONCEAL_VMX_FROM_PT_FLAG;
 
 	VmxVmWrite(
 		VMCS_CTRL_PIN_BASED_VM_EXECUTION_CONTROLS,
@@ -310,6 +330,5 @@ VmxSetupVmcs (
 			ProcbasedCtrls2ToSet
 		)
 	);
-
 
 }

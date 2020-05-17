@@ -124,12 +124,16 @@ WriteControlRegister (
     {
     case 0:
         __writecr0(Value);
+        break;
     case 3:
         __writecr3(Value);
+        break;
     case 4:
         __writecr4(Value);
+        break;
     case 8:
         __writecr8(Value);
+        break;
     default:
         ASSERT(FALSE);
     }
@@ -217,7 +221,7 @@ KdPrintError (
     va_list ArgumentList;
     va_start(ArgumentList, ErrorMessage);
 
-    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, ErrorMessage, ArgumentList);
+    vDbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, ErrorMessage, ArgumentList);
 
     va_end(ArgumentList);
 }
@@ -225,14 +229,14 @@ KdPrintError (
 _Use_decl_annotations_
 VOID
 KdPrintTrace (
-    _In_z_ LPCSTR TraceMessage,
+    LPCSTR TraceMessage,
     ...
 )
 {
     va_list ArgumentList;
     va_start(ArgumentList, TraceMessage);
 
-    DbgPrint(DPFLTR_IHVDRIVER_ID, DPFLTR_TRACE_LEVEL, TraceMessage, ArgumentList);
+    vDbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_TRACE_LEVEL, TraceMessage, ArgumentList);
 
     va_end(ArgumentList);
 }

@@ -8,17 +8,26 @@ NTSTATUS DriverEntry (
 {
     UNREFERENCED_PARAMETER(pRegistryPath);
 
+    NTSTATUS Status = STATUS_SUCCESS;
+
     if (!NT_SUCCESS(GetVmxCapability()))
+    {
+        Status = STATUS_UNSUCCESSFUL;
         goto Exit;
+    }
 
     PGLOBAL_VMM_CONTEXT GlobalVmmContext = NULL;
 
     if (!NT_SUCCESS(AllocateVmmMemory(&GlobalVmmContext)))
+    {
+        Status = STATUS_UNSUCCESSFUL;
         goto Exit;
+    }
 
     ASSERT(GlobalVmmContext != NULL);
 
     KeGenericCallDpc(VmxBroadcastInit, GlobalVmmContext);
+
 Exit:
-    return STATUS_UNSUCCESSFUL;
+    return Status;
 }

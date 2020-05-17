@@ -32,6 +32,12 @@ VmxVmWrite (
     _In_ SIZE_T Value
 );
 
+VOID
+VmxVmRead (
+    _In_ SIZE_T VmxField,
+    _Out_ PSIZE_T pRet
+);
+
 _Check_return_
 UCHAR
 VmxOn (

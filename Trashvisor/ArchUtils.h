@@ -131,12 +131,12 @@ typedef union _VMCS_GUEST_ACCESS_RIGHTS
 
 VOID
 CaptureMiscRegisterContext (
-    _Out_ PREGISTER_STATE 
+    _Out_ PMISC_REGISTER_CONTEXT pMiscRegisterContext 
 );
 
 VOID
 CaptureRegisterContext (
-    _Out_ PREGISTER_CONTEXT
+    _Out_ PREGISTER_CONTEXT pRegisterContext
 );
 
 SEGMENT_DESCRIPTOR_64

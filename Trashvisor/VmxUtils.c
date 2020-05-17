@@ -24,14 +24,15 @@ GetVmxCapability (
     // Read IA32_FEATURE_CONTROL Msr for Vmx information
     ULONGLONG FeatureControlMSR = ReadMsr(IA32_FEATURE_CONTROL);
 
-    if (!(FeatureControlMSR & IA32_FEATURE_CONTROL_ENABLE_VMX_OUTSIDE_SMX_BIT))
+    if (!IA32_FEATURE_CONTROL_ENABLE_VMX_OUTSIDE_SMX(FeatureControlMSR))
     {
+        KdPrintError("FeatureControlMsr: 0x%x\n", FeatureControlMSR);
         KdPrintError("IA32_FEATURE_CONTROL: Vmx outside of Smx bit not set.\n");
         Status = STATUS_UNSUCCESSFUL;
         goto Exit;
     }
 
-    if (!(FeatureControlMSR & IA32_FEATURE_CONTROL_LOCK_BIT_BIT))
+    if (!IA32_FEATURE_CONTROL_LOCK_BIT(FeatureControlMSR))
     {
         KdPrintError("IA32_FEATURE_CONTROL: Lock bit not set.\n");
         Status = STATUS_UNSUCCESSFUL;
@@ -52,12 +53,12 @@ AllocateVmmMemory (
     PHYSICAL_ADDRESS PA;
     PA.QuadPart = MAXULONG64;
 
-    PGLOBAL_VMM_CONTEXT pGlobalVmmContext = *ppGlobalVmmContext;
-
-    pGlobalVmmContext = MmAllocateContiguousMemory(
+    *ppGlobalVmmContext = MmAllocateContiguousMemory(
         sizeof(GLOBAL_VMM_CONTEXT),
         PA
     );
+
+    PGLOBAL_VMM_CONTEXT pGlobalVmmContext = *ppGlobalVmmContext;
 
     if (pGlobalVmmContext == NULL)
     {
@@ -70,7 +71,7 @@ AllocateVmmMemory (
 
     ASSERT(pGlobalVmmContext->TotalProcessorCount > 0);
 
-    pGlobalVmmContext->SystemCr3 = ReadControlRegister(3);
+    pGlobalVmmContext->SystemCr3.Flags = ReadControlRegister(3);
     
     pGlobalVmmContext->pLocalContexts = MmAllocateContiguousMemory(
         sizeof(LOCAL_VMM_CONTEXT) * pGlobalVmmContext->TotalProcessorCount,
@@ -83,6 +84,9 @@ AllocateVmmMemory (
         Status = STATUS_UNSUCCESSFUL;
         goto Exit;
     }
+
+    IA32_VMX_BASIC_REGISTER VmxBasicRegister;
+    VmxBasicRegister.Flags = ReadMsr(IA32_VMX_BASIC);
 
     PLOCAL_VMM_CONTEXT pCurrentLocalVmmContext = pGlobalVmmContext->pLocalContexts;
 
@@ -100,9 +104,10 @@ AllocateVmmMemory (
             goto Exit;
         }
          
-        //pCurrentLocalVmmContext->pVmcs->RevisionId = ReadMsr(IA32_VMX_BASIC);
+        pCurrentLocalVmmContext->pVmcs->RevisionId = VmxBasicRegister.VmcsRevisionId;
+        pCurrentLocalVmmContext->pVmcs->ShadowVmcsIndicator = 0;
 
-        pCurrentLocalVmmContext->PhysVmxOn = MmGetPhysicalAddress(pCurrentLocalVmmContext->pVmcs);
+        pCurrentLocalVmmContext->PhysVmcs = MmGetPhysicalAddress(pCurrentLocalVmmContext->pVmcs);
 
         pCurrentLocalVmmContext->pVmxOn = MmAllocateContiguousMemory(
             sizeof(VMXON_REGION),
@@ -116,7 +121,11 @@ AllocateVmmMemory (
             goto Exit;
         }
 
+        pCurrentLocalVmmContext->pVmxOn->VmcsIdentifier = VmxBasicRegister.VmcsRevisionId;
+
         pCurrentLocalVmmContext->PhysVmxOn = MmGetPhysicalAddress(pCurrentLocalVmmContext->pVmxOn);
+        
+        pCurrentLocalVmmContext->pGlobalVmmContext = pGlobalVmmContext;
 
         pCurrentLocalVmmContext++;
     }
@@ -170,6 +179,16 @@ VmxVmWrite (
 )
 {
     __vmx_vmwrite(VmxField, Value);
+}
+
+_Use_decl_annotations_
+VOID
+VmxVmRead (
+    SIZE_T VmxField,
+    PSIZE_T Ret
+)
+{
+    return __vmx_vmread(VmxField, Ret);
 }
 
 _Use_decl_annotations_
