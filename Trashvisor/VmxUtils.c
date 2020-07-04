@@ -7,7 +7,6 @@ PGLOBAL_VMM_CONTEXT
 AllocateGlobalVmmContext (
 )
 {
-
 	PHYSICAL_ADDRESS HighestAcceptableAddress;
 	HighestAcceptableAddress.QuadPart = MAXULONG64;
 
@@ -24,6 +23,7 @@ AllocateGlobalVmmContext (
 	}
 
 	pGlobalVmmContext->LogicalProcessorCount = KeQueryActiveProcessorCountEx(ALL_PROCESSOR_GROUPS);
+	pGlobalVmmContext->ActivatedProcessorCount = 0;
 
 	ASSERT(pGlobalVmmContext->LogicalProcessorCount > 0);
 
@@ -32,6 +32,12 @@ AllocateGlobalVmmContext (
 		sizeof(PLOCAL_VMM_CONTEXT) * pGlobalVmmContext->LogicalProcessorCount,
 		'VMLP'
 	);
+
+	if (ppLocalVmmContexts == NULL)
+	{
+		KdPrintError("AllocateGlobalVmmContext: Could not allocate ppLocalVmmContext memory.\n");
+		goto Exit;
+	}
 
 	pGlobalVmmContext->ppLocalVmmContexts = ppLocalVmmContexts;
 

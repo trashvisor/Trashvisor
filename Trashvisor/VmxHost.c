@@ -58,7 +58,6 @@ VmxVmExitHandler (
 	case VMX_EXIT_REASON_EXECUTE_INVD:
 	default:
 		__debugbreak();
-		//GdbBreakPoint();
 		break;
 
 	}

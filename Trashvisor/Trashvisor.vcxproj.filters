@@ -24,9 +24,6 @@
     </Inf>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Entry.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="VmxUtils.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -40,6 +37,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="VmxHost.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Trashvisor.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -60,6 +60,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Vmcs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Shared.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

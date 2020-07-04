@@ -25,10 +25,11 @@ VmxBroadcastInit (
 	if (!VmxInitialiseProcessorStub(pLocalVmmContext))
 		KdPrintError("VmxBroadcastInit: Failed.\n");
 
-	/*
+	__debugbreak();
+
 	if (pLocalVmmContext->VmxActivated)
 		_InterlockedIncrement(&pGlobalVmmContext->ActivatedProcessorCount);
-		*/
+
 	KdPrintError("Logical processor %u successfully launched.\n", 
 		KeGetCurrentProcessorNumberEx(NULL)
 	);

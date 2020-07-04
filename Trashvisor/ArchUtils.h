@@ -1,5 +1,6 @@
 #pragma once
 #include "Extern.h"
+#include "Shared.h"
 
 typedef struct _SEGMENT_SETUP
 {

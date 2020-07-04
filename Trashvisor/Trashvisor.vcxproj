@@ -156,7 +156,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ArchUtils.c" />
-    <ClCompile Include="Entry.c" />
+    <ClCompile Include="Trashvisor.c" />
     <ClCompile Include="Vmcs.c" />
     <ClCompile Include="VmxCore.c" />
     <ClCompile Include="VmxHost.c" />
@@ -165,6 +165,7 @@
   <ItemGroup>
     <ClInclude Include="ArchUtils.h" />
     <ClInclude Include="Extern.h" />
+    <ClInclude Include="Shared.h" />
     <ClInclude Include="Vmcs.h" />
     <ClInclude Include="VmxCore.h" />
     <ClInclude Include="VmxHost.h" />
