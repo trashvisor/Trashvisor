@@ -36,21 +36,30 @@
     <ClCompile Include="VmxCore.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Vmcs.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="VmxHost.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Header.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="VmxUtils.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ArchUtils.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ia32.h">
+    <ClInclude Include="VmxCore.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="VmxCore.h">
+    <ClInclude Include="Extern.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="VmxHost.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Vmcs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

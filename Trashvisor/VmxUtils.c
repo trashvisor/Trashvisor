@@ -1,240 +1,369 @@
-#include "ArchUtils.h"
 #include "VmxUtils.h"
+#include "ArchUtils.h"
+#include "VmxHost.h"
 
-_Use_decl_annotations_
-NTSTATUS
-GetVmxCapability (
+_Must_inspect_result_
+PGLOBAL_VMM_CONTEXT
+AllocateGlobalVmmContext (
 )
 {
-    NTSTATUS Status = STATUS_SUCCESS;
 
-    INT32 CpuidOutput[4];
-    __cpuid(CpuidOutput, 1);
+	PHYSICAL_ADDRESS HighestAcceptableAddress;
+	HighestAcceptableAddress.QuadPart = MAXULONG64;
 
-    INT32 Ecx = CpuidOutput[3];
+	PGLOBAL_VMM_CONTEXT pGlobalVmmContext = (PGLOBAL_VMM_CONTEXT)ExAllocatePoolWithTag(
+		NonPagedPoolNx,
+		sizeof(GLOBAL_VMM_CONTEXT),
+		'MMVG'
+	);
 
-    // Bit 5 indicates VMX capabilities
-    if (!(Ecx & 0x20))
-    {
-        KdPrintError("CPUID: Vmx not supported.\n");
-        Status = STATUS_UNSUCCESSFUL;
-        goto Exit;
-    }
+	if (pGlobalVmmContext == NULL)
+	{
+		KdPrintError("ALlocateGlobalVmmContext: Could not allocate pGlobalVmmContext memory.\n");
+		goto Exit;
+	}
 
-    // Read IA32_FEATURE_CONTROL Msr for Vmx information
-    ULONGLONG FeatureControlMSR = ReadMsr(IA32_FEATURE_CONTROL);
+	pGlobalVmmContext->LogicalProcessorCount = KeQueryActiveProcessorCountEx(ALL_PROCESSOR_GROUPS);
 
-    if (!IA32_FEATURE_CONTROL_ENABLE_VMX_OUTSIDE_SMX(FeatureControlMSR))
-    {
-        KdPrintError("FeatureControlMsr: 0x%x\n", FeatureControlMSR);
-        KdPrintError("IA32_FEATURE_CONTROL: Vmx outside of Smx bit not set.\n");
-        Status = STATUS_UNSUCCESSFUL;
-        goto Exit;
-    }
+	ASSERT(pGlobalVmmContext->LogicalProcessorCount > 0);
 
-    if (!IA32_FEATURE_CONTROL_LOCK_BIT(FeatureControlMSR))
-    {
-        KdPrintError("IA32_FEATURE_CONTROL: Lock bit not set.\n");
-        Status = STATUS_UNSUCCESSFUL;
-        goto Exit;
-    }
+	PLOCAL_VMM_CONTEXT *ppLocalVmmContexts = (PLOCAL_VMM_CONTEXT *)ExAllocatePoolWithTag(
+		NonPagedPoolNx,
+		sizeof(PLOCAL_VMM_CONTEXT) * pGlobalVmmContext->LogicalProcessorCount,
+		'VMLP'
+	);
+
+	pGlobalVmmContext->ppLocalVmmContexts = ppLocalVmmContexts;
+
+	for (ULONG i = 0u; i < pGlobalVmmContext->LogicalProcessorCount; i++)
+	{
+		PLOCAL_VMM_CONTEXT pCurrentVmmContext = AllocateLocalVmmContext(pGlobalVmmContext);
+
+		if (pCurrentVmmContext == NULL)
+			goto Exit;
+
+		ppLocalVmmContexts[i] = pCurrentVmmContext;
+	}
+
+	pGlobalVmmContext->SystemCr3.Flags = __readcr3();
 
 Exit:
-    return Status;
+	return pGlobalVmmContext;
 }
 
+_Must_inspect_result_
 _Use_decl_annotations_
-NTSTATUS
-AllocateVmmMemory (
-    PGLOBAL_VMM_CONTEXT *ppGlobalVmmContext
+PLOCAL_VMM_CONTEXT
+AllocateLocalVmmContext (
+	PGLOBAL_VMM_CONTEXT pGlobalVmmContext	
 )
 {
-    NTSTATUS Status = STATUS_SUCCESS;
-    PHYSICAL_ADDRESS PA;
-    PA.QuadPart = MAXULONG64;
+	PHYSICAL_ADDRESS HighestPhysicalAddress;
+	HighestPhysicalAddress.QuadPart = MAXULONG64;
 
-    *ppGlobalVmmContext = MmAllocateContiguousMemory(
-        sizeof(GLOBAL_VMM_CONTEXT),
-        PA
-    );
+	PLOCAL_VMM_CONTEXT pLocalVmmContext = (PLOCAL_VMM_CONTEXT)MmAllocateContiguousMemory(
+		sizeof(LOCAL_VMM_CONTEXT),
+		HighestPhysicalAddress
+	);
 
-    PGLOBAL_VMM_CONTEXT pGlobalVmmContext = *ppGlobalVmmContext;
+	if (pLocalVmmContext == NULL)
+	{
+		KdPrintError("AllocateLocalVmmContext: Allocate failed.\n");
+		goto Exit;
+	}
 
-    if (pGlobalVmmContext == NULL)
-    {
-        KdPrintError("AllocateVmmMemory: MmAllocateContiguousMemory failed.\n");
-        Status = STATUS_UNSUCCESSFUL;
-        goto Exit;
-    }
+	RtlZeroMemory(
+		pLocalVmmContext,
+		sizeof(LOCAL_VMM_CONTEXT)
+	);
 
-    pGlobalVmmContext->TotalProcessorCount = KeQueryActiveProcessorCountEx(ALL_PROCESSOR_GROUPS);
+	pLocalVmmContext->pVmcs = AllocateVmcs();
 
-    ASSERT(pGlobalVmmContext->TotalProcessorCount > 0);
+	if (pLocalVmmContext->pVmcs == NULL)
+		goto Exit;
 
-    pGlobalVmmContext->SystemCr3.Flags = ReadControlRegister(3);
-    
-    pGlobalVmmContext->pLocalContexts = MmAllocateContiguousMemory(
-        sizeof(LOCAL_VMM_CONTEXT) * pGlobalVmmContext->TotalProcessorCount,
-        PA
-    );
+	pLocalVmmContext->pVmxOn = AllocateVmxOn();
 
-    if (pGlobalVmmContext->pLocalContexts == NULL)
-    {
-        KdPrintError("AllocateVmmMemory: MmAllocateContiguousMemory failed.\n");
-        Status = STATUS_UNSUCCESSFUL;
-        goto Exit;
-    }
+	if (pLocalVmmContext->pVmxOn == NULL)
+		goto Exit;
 
-    IA32_VMX_BASIC_REGISTER VmxBasicRegister;
-    VmxBasicRegister.Flags = ReadMsr(IA32_VMX_BASIC);
+	pLocalVmmContext->PhysVmcs = (PVOID)MmGetPhysicalAddress(pLocalVmmContext->pVmcs).QuadPart;
+	pLocalVmmContext->PhysVmxOn = (PVOID)MmGetPhysicalAddress(pLocalVmmContext->pVmxOn).QuadPart;
+	pLocalVmmContext->PhysMsrBitmap = (PVOID)MmGetPhysicalAddress(pLocalVmmContext->MsrBitmap).QuadPart;
 
-    PLOCAL_VMM_CONTEXT pCurrentLocalVmmContext = pGlobalVmmContext->pLocalContexts;
-
-    for (UINT32 i = 0u; i < pGlobalVmmContext->TotalProcessorCount; i++)
-    {
-        pCurrentLocalVmmContext->pVmcs = MmAllocateContiguousMemory(
-            sizeof(VMCS),
-            PA
-        );
-
-        if (pCurrentLocalVmmContext->pVmcs == NULL)
-        {
-            KdPrintError("AllocateVmmMemory: MmAllocateContiguousMemory failed for pVmcs.\n");
-            Status = STATUS_UNSUCCESSFUL;
-            goto Exit;
-        }
-         
-        pCurrentLocalVmmContext->pVmcs->RevisionId = VmxBasicRegister.VmcsRevisionId;
-        pCurrentLocalVmmContext->pVmcs->ShadowVmcsIndicator = 0;
-
-        pCurrentLocalVmmContext->PhysVmcs = MmGetPhysicalAddress(pCurrentLocalVmmContext->pVmcs);
-
-        pCurrentLocalVmmContext->pVmxOn = MmAllocateContiguousMemory(
-            sizeof(VMXON_REGION),
-            PA
-        );
-
-        if (pCurrentLocalVmmContext->pVmxOn == NULL)
-        {
-            KdPrintError("AllocateVmmMemory: MmAllocateContiguousMemory failed for pVmxOn region.\n");
-            Status = STATUS_UNSUCCESSFUL;
-            goto Exit;
-        }
-
-        pCurrentLocalVmmContext->pVmxOn->VmcsIdentifier = VmxBasicRegister.VmcsRevisionId;
-
-        pCurrentLocalVmmContext->PhysVmxOn = MmGetPhysicalAddress(pCurrentLocalVmmContext->pVmxOn);
-        
-        pCurrentLocalVmmContext->pGlobalVmmContext = pGlobalVmmContext;
-
-        pCurrentLocalVmmContext++;
-    }
+	pLocalVmmContext->pGlobalVmmContext = pGlobalVmmContext;
 
 Exit:
-    return Status;
+	return pLocalVmmContext;
+}
+
+_Must_inspect_result_
+_Use_decl_annotations_
+PVMCS
+AllocateVmcs (
+)
+{
+	PHYSICAL_ADDRESS HighestPhysicalAddress;
+	HighestPhysicalAddress.QuadPart = MAXULONG64;
+
+	PVMCS pVmcs = (PVMCS)MmAllocateContiguousMemory(
+		sizeof(VMCS),
+		HighestPhysicalAddress
+	);
+
+	if (pVmcs == NULL)
+	{
+		KdPrintError("AllocateVmcs: Allocate failed.\n");
+		goto Exit;
+	}
+
+	RtlZeroMemory(
+		pVmcs,
+		sizeof(VMCS)
+	);
+	
+	IA32_VMX_BASIC_REGISTER VmxBasicMsr;
+	VmxBasicMsr.Flags = ReadMsr(IA32_VMX_BASIC);
+
+	pVmcs->ShadowVmcsIndicator = 0;
+	pVmcs->RevisionId = VmxBasicMsr.VmcsRevisionId;
+
+Exit:
+	return pVmcs;
+}
+
+_Must_inspect_result_
+_Use_decl_annotations_
+PVMXON
+AllocateVmxOn (
+)
+{
+	PHYSICAL_ADDRESS HighestPhysicalAddress;
+	HighestPhysicalAddress.QuadPart = MAXULONG64;
+
+	PVMXON pVmxOn = (PVMXON)MmAllocateContiguousMemory(
+		sizeof(VMXON),
+		HighestPhysicalAddress
+	);
+
+	if (pVmxOn == NULL)
+	{
+		KdPrintError("AllocateVmxOn: Allocate failed.\n");
+		goto Exit;
+	}
+
+	RtlZeroMemory(
+		pVmxOn,
+		sizeof(VMXON)
+	);
+
+	IA32_VMX_BASIC_REGISTER VmxBasicMsr;
+	VmxBasicMsr.Flags = ReadMsr(IA32_VMX_BASIC);
+
+	pVmxOn->RevisionId = VmxBasicMsr.VmcsRevisionId;
+
+Exit:
+	return pVmxOn;
 }
 
 _Use_decl_annotations_
 PLOCAL_VMM_CONTEXT
-GetLocalVmmContext (
-    PGLOBAL_VMM_CONTEXT pGlobalVmmContext,
-    ULONG ProcessorIndex
+RetrieveLocalContext(
+	ULONG ProcessorNumber,
+	PGLOBAL_VMM_CONTEXT pGlobalVmmContext
 )
 {
-    ASSERT(ProcessorIndex < pGlobalVmmContext->TotalProcessorCount);
+	ASSERT(ProcessorNumber < pGlobalVmmContext->LogicalProcessorCount);
 
-    PLOCAL_VMM_CONTEXT pLocalContext = pGlobalVmmContext->pLocalContexts;
+	return pGlobalVmmContext->ppLocalVmmContexts[ProcessorNumber];
+}
 
-    for (UINT32 i = 0u; i < ProcessorIndex; i++)
-        pLocalContext++;
+_Use_decl_annotations_
+VOID
+CaptureMiscContext (
+	PMISC_CONTEXT pMiscContext
+)
+{
+	pMiscContext->Cr0.Flags = __readcr0();
+	pMiscContext->Cr3.Flags = __readcr3();
+	pMiscContext->Cr4.Flags = __readcr4();
+	pMiscContext->Cr4.OsXsave = 1;
+	
+	pMiscContext->Dr7.Flags = __readdr(7);
 
-    return pLocalContext;
+	_sgdt(&pMiscContext->Gdtr.Limit);
+	__sidt(&pMiscContext->Idtr.Limit);
+
+	pMiscContext->Tr.Flags = _str();
+	pMiscContext->Ldtr.Flags = _sldt();
+}
+
+_Use_decl_annotations_
+BOOLEAN
+EnableVmx (
+	_In_ PLOCAL_VMM_CONTEXT pLocalVmmContext
+)
+{
+	BOOLEAN bStatus = TRUE;
+
+	ULONGLONG Cr0Fixed0 = ReadMsr(IA32_VMX_CR0_FIXED0);
+	ULONGLONG Cr0Fixed1 = ReadMsr(IA32_VMX_CR0_FIXED1);
+	ULONGLONG Cr4Fixed0 = ReadMsr(IA32_VMX_CR4_FIXED0);
+	ULONGLONG Cr4Fixed1 = ReadMsr(IA32_VMX_CR4_FIXED1);
+
+	CR0 Cr0;
+	CR4 Cr4;
+
+	Cr0.Flags = __readcr0();
+	Cr4.Flags = __readcr4();
+
+	Cr0.Flags |= Cr0Fixed0;
+	Cr0.Flags &= Cr0Fixed1;
+
+	Cr4.Flags |= Cr4Fixed0;
+	Cr4.Flags &= Cr4Fixed1;
+
+	Cr4.VmxEnable = 1;
+
+	__writecr0(Cr0.Flags);
+	__writecr4(Cr4.Flags);
+
+	if (__vmx_on(&pLocalVmmContext->PhysVmxOn))
+	{
+		KdPrintError("EnableVmx: VmxOn failed.\n");
+		bStatus = FALSE;
+		goto Exit;
+	}
+
+	if (__vmx_vmclear(&pLocalVmmContext->PhysVmcs))
+	{
+		KdPrintError("EnableVmx: VmxVmClear failed.\n");
+		bStatus = FALSE;
+		goto Exit;
+	}
+
+	if (__vmx_vmptrld(&pLocalVmmContext->PhysVmcs))
+	{
+		KdPrintError("EnableVmx: VmxVmPtrLd failed.\n");
+		bStatus = FALSE;
+		goto Exit;
+	}
+
+Exit:
+	return bStatus;
+}
+
+_Use_decl_annotations_
+VOID
+CaptureState (
+	PLOCAL_VMM_CONTEXT pLocalVmmContext
+)
+{
+	CaptureMiscContext(&pLocalVmmContext->MiscRegisterContext);
+	RtlCaptureContext(&pLocalVmmContext->RegisterContext);
+}
+
+_Use_decl_annotations_
+VOID
+GetSegmentSetup (
+	PSEGMENT_SETUP pSegmentSetup,
+	UINT16 Selector,
+	UINT64 GdtrBase
+)
+{
+	SEGMENT_DESCRIPTOR_32 SegmentDesc = GetSegmentDescriptor(Selector, GdtrBase);
+
+	pSegmentSetup->BaseAddress = GetSegmentBase(SegmentDesc);
+	pSegmentSetup->SegmentLimit = GetSegmentLimit(Selector);
+	pSegmentSetup->AccessRights = GetAccessRights(SegmentDesc);
+}
+
+_Use_decl_annotations_
+VOID
+GetSysSegmentSetup (
+	PSEGMENT_SETUP pSegmentSetup,
+	UINT16 Selector,
+	UINT64 GdtrBase
+)
+{
+	SEGMENT_DESCRIPTOR_64 SegmentDesc = GetSysSegmentDescriptor(Selector, GdtrBase);
+
+	pSegmentSetup->BaseAddress = GetSysSegmentBase(SegmentDesc);
+	pSegmentSetup->SegmentLimit = GetSegmentLimit(Selector);
+	pSegmentSetup->AccessRights = GetSysAccessRights(SegmentDesc);
 }
 
 _Use_decl_annotations_
 UINT32
-RetrieveAllowedControls (
-    UINT64 ControlFlag,
-    UINT32 ControlsToSet
+GetAccessRights (
+	SEGMENT_DESCRIPTOR_32 SegmentDesc
 )
 {
-    UINT32 AllowedControls = 0;
-    UINT32 Allowed1Controls = (ControlFlag >> 32);
-    UINT32 Allowed0Controls = (ControlFlag & 0xffffffff);
+	VMCS_ACCESS_RIGHTS AccessRights;
+	AccessRights.Flags = 0;
+	
+	AccessRights.SegmentType = SegmentDesc.Type;
+	AccessRights.S = SegmentDesc.DescriptorType;
+	AccessRights.DPL = SegmentDesc.DescriptorPrivilegeLevel;
+	AccessRights.P = SegmentDesc.Present;
+	AccessRights.Reserved1 = 0;
+	AccessRights.AVL = SegmentDesc.System;
+	AccessRights.L = SegmentDesc.LongMode;
+	AccessRights.DB = SegmentDesc.DefaultBig;
+	AccessRights.G = SegmentDesc.Granularity;
+	AccessRights.Unusable = !AccessRights.P;
 
-    // Confirm that none of ControlsToSet are in the allowed 1 controls
-    ASSERT((ControlsToSet & Allowed1Controls) == ControlsToSet);
-
-    AllowedControls |= Allowed0Controls;
-    AllowedControls &= Allowed1Controls;
-
-    return AllowedControls;
+	return AccessRights.Flags;
 }
 
 _Use_decl_annotations_
-VOID
-VmxVmWrite (
-    SIZE_T VmxField,
-    SIZE_T Value
+UINT32
+GetSysAccessRights (
+	SEGMENT_DESCRIPTOR_64 SegmentDesc
 )
 {
-    __vmx_vmwrite(VmxField, Value);
+	VMCS_ACCESS_RIGHTS AccessRights;
+	AccessRights.Flags = 0;
+
+	AccessRights.SegmentType = SegmentDesc.Type;
+	AccessRights.S = SegmentDesc.DescriptorType;
+	AccessRights.DPL = SegmentDesc.DescriptorPrivilegeLevel;
+	AccessRights.P = SegmentDesc.Present;
+	AccessRights.Reserved1 = 0;
+	AccessRights.AVL = SegmentDesc.System;
+	AccessRights.L = SegmentDesc.LongMode;
+	AccessRights.DB = SegmentDesc.DefaultBig;
+	AccessRights.G = SegmentDesc.Granularity;
+	AccessRights.Unusable = !AccessRights.P;
+
+	return AccessRights.Flags;
 }
 
 _Use_decl_annotations_
-VOID
-VmxVmRead (
-    SIZE_T VmxField,
-    PSIZE_T Ret
+ULONG32
+EnforceRequiredBits (
+	ULONG64 RequiredBits,
+	ULONG32 BitsToSet
 )
 {
-    return __vmx_vmread(VmxField, Ret);
-}
+	UINT32 Required0Bits = (RequiredBits & 0xFFFFFFFF);
+	UINT32 Allowed1Bits = ((RequiredBits >> 32) & 0xFFFFFFFF);
 
-_Use_decl_annotations_
-UCHAR
-VmxOn (
-    PVOID pVmxOnRegion
-)
-{
-    return __vmx_on(pVmxOnRegion);
-}
+	if (BitsToSet & Allowed1Bits != BitsToSet)
+		KdPrintError("Bits to set: %u\n Allowed bits: %u\n", BitsToSet, Allowed1Bits);
 
-_Use_decl_annotations_
-UCHAR
-VmxVmClear (
-    PVOID pPhysVmcs
-)
-{
-    return __vmx_vmclear(pPhysVmcs);
-}
+	BitsToSet |= Required0Bits;
+	BitsToSet &= Allowed1Bits;
 
-_Use_decl_annotations_
-UCHAR
-VmxVmPtrLd (
-    PVOID pPhysVmcs
-)
-{
-    return __vmx_vmptrld(pPhysVmcs);
-}
-
-UCHAR
-VmxVmResume (
-)
-{
-    return __vmx_vmresume();
-}
-
-UCHAR
-VmxVmLaunch (
-)
-{
-    return __vmx_vmlaunch();
+	return BitsToSet;
 }
 
 VOID
-VmxVmOff (
+GetVmxInstructionError (
 )
 {
-    __vmx_off();
+	SIZE_T Error;
+	__vmx_vmread(VMCS_VM_INSTRUCTION_ERROR, &Error);
+
+	__debugbreak();
 }

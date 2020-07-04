@@ -145,6 +145,7 @@
     <ClCompile>
       <TreatWarningAsError>false</TreatWarningAsError>
       <EnablePREfast>true</EnablePREfast>
+      <WarningLevel>Level1</WarningLevel>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -156,14 +157,17 @@
   <ItemGroup>
     <ClCompile Include="ArchUtils.c" />
     <ClCompile Include="Entry.c" />
+    <ClCompile Include="Vmcs.c" />
     <ClCompile Include="VmxCore.c" />
+    <ClCompile Include="VmxHost.c" />
     <ClCompile Include="VmxUtils.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ArchUtils.h" />
-    <ClInclude Include="Header.h" />
-    <ClInclude Include="ia32.h" />
+    <ClInclude Include="Extern.h" />
+    <ClInclude Include="Vmcs.h" />
     <ClInclude Include="VmxCore.h" />
+    <ClInclude Include="VmxHost.h" />
     <ClInclude Include="VmxUtils.h" />
   </ItemGroup>
   <ItemGroup>

@@ -1,33 +1,102 @@
-#include "Header.h"
+#include "ArchUtils.h"
 #include "VmxUtils.h"
+#include "VmxCore.h"
 
-NTSTATUS DriverEntry (
-    _In_ PDRIVER_OBJECT pDriverObject,
-    _In_ PUNICODE_STRING pRegistryPath
+UNICODE_STRING DeviceName;
+UNICODE_STRING SymbolicLinkName;
+
+DRIVER_UNLOAD DriverUnload;
+
+PGLOBAL_VMM_CONTEXT pGlobalVmmContext;
+
+NTSTATUS
+DriverEntry (
+	PDRIVER_OBJECT pDriverObject,
+	PUNICODE_STRING RegistryPath
 )
 {
-    UNREFERENCED_PARAMETER(pRegistryPath);
+	UNREFERENCED_PARAMETER(RegistryPath);
 
-    NTSTATUS Status = STATUS_SUCCESS;
+	NTSTATUS Status = STATUS_SUCCESS;
 
-    if (!NT_SUCCESS(GetVmxCapability()))
-    {
-        Status = STATUS_UNSUCCESSFUL;
-        goto Exit;
-    }
+	pDriverObject->DriverUnload = DriverUnload;
 
-    PGLOBAL_VMM_CONTEXT GlobalVmmContext = NULL;
+	if (!IsVmxSupported())
+	{
+		Status = STATUS_UNSUCCESSFUL;
+		goto Exit;
+	}
+	
+	pGlobalVmmContext = AllocateGlobalVmmContext();
 
-    if (!NT_SUCCESS(AllocateVmmMemory(&GlobalVmmContext)))
-    {
-        Status = STATUS_UNSUCCESSFUL;
-        goto Exit;
-    }
+	if (pGlobalVmmContext == NULL)
+	{
+		Status = STATUS_UNSUCCESSFUL;
+		goto Exit;
+	}
 
-    ASSERT(GlobalVmmContext != NULL);
+	KeGenericCallDpc(
+		VmxBroadcastInit,
+		pGlobalVmmContext
+	);
 
-    KeGenericCallDpc(VmxBroadcastInit, GlobalVmmContext);
+	/*
+	if (pGlobalVmmContext->ActivatedProcessorCount != 
+		pGlobalVmmContext->LogicalProcessorCount)
+	{
+		Status = STATUS_UNSUCCESSFUL;
+		goto Exit;
+	}
+	*/
+	//KdPrintError("Successfully hypervised!\n");
+/*
+	RtlInitUnicodeString(&DeviceName, L"\\Device\\HVD");
+
+	PDEVICE_OBJECT pHvdDevice;
+
+	Status = IoCreateDevice(
+		pDriverObject,
+		0,
+		&DeviceName,
+		FILE_DEVICE_UNKNOWN,
+		FILE_DEVICE_SECURE_OPEN,
+		FALSE,
+		&pHvdDevice
+	);
+
+	if (!NT_SUCCESS(Status))
+	{
+		KdPrintError("Failed to create device. Error code: %d\n",
+			Status
+		);
+
+		goto Exit;
+	}
+
+	RtlInitUnicodeString(&SymbolicLinkName, L"\\DosDevices\\HVDDevice");
+
+	Status = IoCreateSymbolicLink(&SymbolicLinkName, &DeviceName);
+
+	if (!NT_SUCCESS(Status))
+	{
+		KdPrintError("Failed to create symbolic link. Error code: %d.\n",
+			Status
+		);
+		
+		goto Exit;
+	}*/
 
 Exit:
-    return Status;
+	return Status;
+}
+
+VOID 
+DriverUnload (
+	PDRIVER_OBJECT pDriverObject
+)
+{
+	KeGenericCallDpc(
+		VmxBroadcastTeardown,
+		pGlobalVmmContext
+	);
 }
