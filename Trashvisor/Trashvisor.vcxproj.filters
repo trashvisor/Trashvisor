@@ -42,6 +42,9 @@
     <ClCompile Include="Trashvisor.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ControlCallbacks.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="VmxUtils.h">
@@ -63,6 +66,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Shared.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ControlCallbacks.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

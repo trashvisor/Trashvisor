@@ -1,5 +1,6 @@
 #include "ArchUtils.h"
 #include "VmxCore.h"
+#include "ControlCallbacks.h"
 
 _Dispatch_type_(IRP_MJ_CREATE) DRIVER_DISPATCH DriverDeviceCreate;
 _Dispatch_type_(IRP_MJ_CLOSE) DRIVER_DISPATCH DriverDeviceClose;
@@ -21,6 +22,8 @@ DriverEntry (
 
 	UNICODE_STRING NtDeviceName;
 	UNICODE_STRING DosDeviceLinkName;
+
+	KeInitializeGuardedMutex(&CallbacksMutex);
 
 	pDriverObject->MajorFunction[IRP_MJ_CREATE] = DriverDeviceCreate;
 	pDriverObject->MajorFunction[IRP_MJ_CLOSE] = DriverDeviceClose;
@@ -57,7 +60,7 @@ DriverEntry (
 
 	RtlInitUnicodeString(&NtDeviceName, NT_DEVICE_NAME);
 
-	PDEVICE_OBJECT pHvdDevice;
+	PDEVICE_OBJECT pTvDevice;
 
 	Status = IoCreateDevice(
 		pDriverObject,
@@ -66,7 +69,7 @@ DriverEntry (
 		FILE_DEVICE_UNKNOWN,
 		FILE_DEVICE_SECURE_OPEN,
 		FALSE,
-		&pHvdDevice
+		&pTvDevice
 	);
 
 	if (!NT_SUCCESS(Status))
@@ -138,15 +141,23 @@ DriverDeviceCtrl (
 	pIrpStack = IoGetCurrentIrpStackLocation(pIrp);
 	Ioctl = pIrpStack->Parameters.DeviceIoControl.IoControlCode;
 
+	__debugbreak();
+
 	switch (Ioctl)
 	{
 	case IOCTL_LOG_CPUID_PROCESS:
+		Status = CtrlLogCpuidForProcess(pDeviceObject, pIrp);
 		break;
 	default:
 		KdPrintError("DriverDeviceCtrl: Default case.\n");
 		Status = STATUS_UNSUCCESSFUL;
 		break;
 	}
+
+	pIrp->IoStatus.Status = Status;
+	pIrp->IoStatus.Information = 0;
+
+	IoCompleteRequest(pIrp, IO_NO_INCREMENT);
 
 	return Status;
 }
