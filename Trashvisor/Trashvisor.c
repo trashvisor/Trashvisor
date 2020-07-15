@@ -141,7 +141,7 @@ DriverDeviceCtrl (
 	pIrpStack = IoGetCurrentIrpStackLocation(pIrp);
 	Ioctl = pIrpStack->Parameters.DeviceIoControl.IoControlCode;
 
-	__debugbreak();
+	//__debugbreak();
 
 	switch (Ioctl)
 	{

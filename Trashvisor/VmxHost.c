@@ -17,12 +17,6 @@ VmxVmExitHandler (
 	{
 	case VMX_EXIT_REASON_EXECUTE_CPUID:
 	{
-		int Cpuid[4];
-		__cpuid(Cpuid, pGPContext->Rax);
-		pGPContext->Rax = Cpuid[0];
-		pGPContext->Rbx = Cpuid[1];
-		pGPContext->Rcx = Cpuid[2];
-		pGPContext->Rdx = Cpuid[3];
 
 		UINT64 GuestCr3;
 		__vmx_vmread(VMCS_GUEST_CR3, &GuestCr3);
@@ -30,17 +24,16 @@ VmxVmExitHandler (
 		ULONG64 Rip;
 		__vmx_vmread(VMCS_GUEST_RIP, &Rip);
 
-		/*
 		if (Rip < 0x7fffffffffff)
-		{
-			KdPrintError("Cr3: 0x%llx\n",
-				GuestCr3);
-		}*/
+			KdPrintError(
+				"Cpuid called for process with Cr3: 0x%llx\n",
+				GuestCr3 & ~0xfffULL
+			);
 
 		// Spoof, not log lol
 		if (LogCpuidProcessCr3 == (GuestCr3 & ~0xfffULL))
 		{
-			//__debugbreak();
+			__debugbreak();
 
 			KdPrintError(
 				"Cpuid called for process with RAX: 0x%llx\n",
@@ -51,6 +44,15 @@ VmxVmExitHandler (
 			pGPContext->Rbx = 0x100;
 			pGPContext->Rcx = 0x100;
 			pGPContext->Rdx = 0x100;
+		}
+		else
+		{
+            int Cpuid[4];
+            __cpuid(Cpuid, pGPContext->Rax);
+            pGPContext->Rax = Cpuid[0];
+            pGPContext->Rbx = Cpuid[1];
+            pGPContext->Rcx = Cpuid[2];
+            pGPContext->Rdx = Cpuid[3];
 		}
 
 		goto IncrementRip;

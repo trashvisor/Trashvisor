@@ -30,9 +30,16 @@ CpuidLoggingProcessCallback (
 
     if (Found != NULL)
     {
+        KdPrintError(
+            "Creating process: %wZ\n",
+            pCreateInfo->CommandLine
+        );
+
         //__debugbreak();
         // Assume that only one process will trigger this 
+        KeAcquireGuardedMutex(&CallbacksMutex);
         LogCpuidProcessCr3 = *(PULONG64)(pKproc + 0x28) & ~0xfffULL;
+        KeReleaseGuardedMutex(&CallbacksMutex);
 
         KdPrintError("TRACKING CR3: 0x%llx\n", LogCpuidProcessCr3);
     }
@@ -68,6 +75,13 @@ CtrlLogCpuidForProcess (
     }
     
     if (wcslen(pIoctlInfo->FilePath) > MAX_PATH_LENGTH)
+		/*
+		if (Rip < 0x7fffffffffff)
+		{
+			KdPrintError("Cr3: 0x%llx\n",
+				GuestCr3);
+		}*/
+
     {
         Status = STATUS_INVALID_PARAMETER;
         goto Exit;
@@ -78,6 +92,8 @@ CtrlLogCpuidForProcess (
         pIoctlInfo->ProcessName,
         pIoctlInfo->FilePath
     );
+
+    /*
 
     // Next stage of validation/creation
     // Attempt to create a file with the name
@@ -121,7 +137,7 @@ CtrlLogCpuidForProcess (
 
         goto Exit;
     }
-
+    */
     KeAcquireGuardedMutex(&CallbacksMutex);
 
     RtlCopyMemory(
