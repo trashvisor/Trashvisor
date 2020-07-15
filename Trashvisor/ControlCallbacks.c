@@ -1,6 +1,6 @@
 #include "ControlCallbacks.h"
 
-ULONG64 LogCpuidProcessCr3 = 0;
+UINT64 LogCpuidProcessCr3 = 0;
 INFO_IOCTL_CPUID_PROCESS InfoIoctlCpuidProcess;
 KGUARDED_MUTEX CallbacksMutex;
 
@@ -11,13 +11,30 @@ CpuidLoggingProcessCallback (
     PPS_CREATE_NOTIFY_INFO pCreateInfo
 )
 {
+    if (pCreateInfo == NULL)
+        return;
+
     PCHAR pKproc = (PCHAR)pEproc;
 
-    if (!wcsstr(InfoIoctlCpuidProcess.ProcessName, pCreateInfo->CommandLine))
+    /*
+    KdPrintError(
+        "Creating process: %wZ\n",
+        pCreateInfo->CommandLine
+    );
+    */
+
+    PWCHAR Found = wcsstr(
+        pCreateInfo->CommandLine->Buffer,
+        InfoIoctlCpuidProcess.ProcessName
+    );
+
+    if (Found != NULL)
     {
-        __debugbreak();
+        //__debugbreak();
         // Assume that only one process will trigger this 
-        LogCpuidProcessCr3 = *(PULONG64)(pKproc + 0x28);
+        LogCpuidProcessCr3 = *(PULONG64)(pKproc + 0x28) & ~0xfffULL;
+
+        KdPrintError("TRACKING CR3: 0x%llx\n", LogCpuidProcessCr3);
     }
 }
 
@@ -57,7 +74,7 @@ CtrlLogCpuidForProcess (
     }
     
     KdPrintError(
-        "Received: Process name => %wZ\nFile path => %wZ\n",
+        "Received: Process name => %S\nFile path => %S\n",
         pIoctlInfo->ProcessName,
         pIoctlInfo->FilePath
     );
@@ -68,6 +85,7 @@ CtrlLogCpuidForProcess (
 
     OBJECT_ATTRIBUTES Oa;
     UNICODE_STRING FilePath;
+
     RtlInitUnicodeString(&FilePath, pIoctlInfo->FilePath);
 
     InitializeObjectAttributes(
@@ -96,9 +114,8 @@ CtrlLogCpuidForProcess (
 
     if (!NT_SUCCESS(Status))
     {
-        __debugbreak();
         KdPrintError(
-            "CtrlLogCpuidProcess: ZwCreateFile failed with: %d\n",
+            "CtrlLogCpuidProcess: ZwCreateFile failed with: 0x%x\n",
             Status
         );
 
@@ -113,13 +130,23 @@ CtrlLogCpuidForProcess (
         sizeof(INFO_IOCTL_CPUID_PROCESS)
     );
 
+
     KeReleaseGuardedMutex(&CallbacksMutex);
 
-    PsSetCreateProcessNotifyRoutineEx2(
+    Status = PsSetCreateProcessNotifyRoutineEx2(
         PsCreateProcessNotifySubsystems,
         CpuidLoggingProcessCallback,
         FALSE
     );
+
+    if (!NT_SUCCESS(Status))
+    {
+        __debugbreak();
+        KdPrintError(
+            "CtrlLogCpuidProcess: PsSetCreateProcessNotifyRoutineEx2 failed with: 0x%x\n",
+            Status
+        );
+    }
 
 Exit:
     return Status;

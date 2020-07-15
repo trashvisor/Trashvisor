@@ -25,7 +25,7 @@ VmxBroadcastInit (
 	if (!VmxInitialiseProcessorStub(pLocalVmmContext))
 		KdPrintError("VmxBroadcastInit: Failed.\n");
 
-	__debugbreak();
+//	__debugbreak();
 
 	if (pLocalVmmContext->VmxActivated)
 		_InterlockedIncrement(&pGlobalVmmContext->ActivatedProcessorCount);

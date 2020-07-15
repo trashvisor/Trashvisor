@@ -1,4 +1,5 @@
 #include "VmxHost.h"
+#include "ControlCallbacks.h"
 
 _Use_decl_annotations_
 VOID
@@ -23,11 +24,34 @@ VmxVmExitHandler (
 		pGPContext->Rcx = Cpuid[2];
 		pGPContext->Rdx = Cpuid[3];
 
+		UINT64 GuestCr3;
+		__vmx_vmread(VMCS_GUEST_CR3, &GuestCr3);
+
 		ULONG64 Rip;
 		__vmx_vmread(VMCS_GUEST_RIP, &Rip);
 
+		/*
 		if (Rip < 0x7fffffffffff)
-			pGPContext->Rax = 0;
+		{
+			KdPrintError("Cr3: 0x%llx\n",
+				GuestCr3);
+		}*/
+
+		// Spoof, not log lol
+		if (LogCpuidProcessCr3 == (GuestCr3 & ~0xfffULL))
+		{
+			//__debugbreak();
+
+			KdPrintError(
+				"Cpuid called for process with RAX: 0x%llx\n",
+				pGPContext->Rax
+			);
+
+			pGPContext->Rax = 0x100;
+			pGPContext->Rbx = 0x100;
+			pGPContext->Rcx = 0x100;
+			pGPContext->Rdx = 0x100;
+		}
 
 		goto IncrementRip;
 	}

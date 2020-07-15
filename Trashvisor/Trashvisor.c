@@ -149,7 +149,7 @@ DriverDeviceCtrl (
 		Status = CtrlLogCpuidForProcess(pDeviceObject, pIrp);
 		break;
 	default:
-		KdPrintError("DriverDeviceCtrl: Default case.\n");
+		KdPrintError("DriverDeviceCtrl: Uknown case.\n");
 		Status = STATUS_UNSUCCESSFUL;
 		break;
 	}

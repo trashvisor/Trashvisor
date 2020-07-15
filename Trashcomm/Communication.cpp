@@ -28,8 +28,8 @@ int main()
         sizeof(InfoIoctl)
     );
 
-    auto FilePath = L"C:\\Users\\trashcan\\Desktop\\Log.txt";
-    auto ProcName = L"Uniquename.exe";
+    auto FilePath = L"\\DosDevices\\C:\\Users\\trashcan\\Desktop\\Log.txt";
+    auto ProcName = L"Project1.exe";
     wmemcpy(InfoIoctl.FilePath, FilePath, std::char_traits<wchar_t>::length(FilePath));
     wmemcpy(InfoIoctl.ProcessName, ProcName, std::char_traits<wchar_t>::length(ProcName));
 
