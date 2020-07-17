@@ -2,9 +2,16 @@
 #include "Shared.h"
 #include "ArchUtils.h"
 
-extern ULONG64 LogCpuidProcessCr3;
+typedef struct _CPUID_LOGGING_INFO
+{
+    HANDLE FileHandle;
+    HANDLE ProcessId;
+    CR3 Cr3;
+    PPEB pPeb;
+} CPUID_LOGGING_INFO, *PCPUID_LOGGING_INFO;
+
 extern KGUARDED_MUTEX CallbacksMutex;
-extern INFO_IOCTL_CPUID_PROCESS InfoIoctlCpuidProcess;
+extern CPUID_LOGGING_INFO CpuidLoggingInfo;
 
 NTSTATUS
 CtrlLogCpuidForProcess (

@@ -1,12 +1,15 @@
 #include "ControlCallbacks.h"
 
-UINT64 LogCpuidProcessCr3 = 0;
-INFO_IOCTL_CPUID_PROCESS InfoIoctlCpuidProcess;
-KGUARDED_MUTEX CallbacksMutex;
+#define USER_DIRECTORY_TABLE_BASE_OFFSET 0x280
+#define PPEB_OFFSET 0x3f8
+
+KGUARDED_MUTEX CallbacksMutex = { 0 };
+CPUID_LOGGING_INFO CpuidLoggingInfo = { 0 };
+WCHAR ProcessName[MAX_PATH_LENGTH];
 
 VOID
 CpuidLoggingProcessCallback (
-    PEPROCESS pEproc,
+    PEPROCESS Eproc,
     HANDLE ProcessId,
     PPS_CREATE_NOTIFY_INFO pCreateInfo
 )
@@ -14,30 +17,30 @@ CpuidLoggingProcessCallback (
     if (pCreateInfo == NULL)
         return;
 
-    PCHAR pKproc = (PCHAR)pEproc;
+    PCHAR pKproc = (PCHAR)Eproc;
+    PCHAR pEproc = (PCHAR)Eproc;
 
     PWCHAR Found = wcsstr(
         pCreateInfo->CommandLine->Buffer,
-        InfoIoctlCpuidProcess.ProcessName
+        ProcessName
     );
 
     if (Found != NULL)
     {
-        KdPrintError(
-            "Found process: %wZ => 0x%x\n",
-            pCreateInfo->CommandLine,
-            ProcessId
-        );
-
-        //__debugbreak();
-
-        KeAcquireGuardedMutex(&CallbacksMutex);
         // Get UserDirectoryTableBase, introduced post-meltdown
         // DirectoryTableBase is the Kernel Cr3
-        LogCpuidProcessCr3 = *(PULONG64)(pKproc + 0x280) & ~0xfffULL;
+        CR3 CR3ToTrack;
+        CR3ToTrack.Flags = *(PULONG64)(pKproc + USER_DIRECTORY_TABLE_BASE_OFFSET);
+
+        KeAcquireGuardedMutex(&CallbacksMutex);
+
+        CpuidLoggingInfo.ProcessId = ProcessId;
+        CpuidLoggingInfo.Cr3 = CR3ToTrack;
+        CpuidLoggingInfo.pPeb = *(PUINT64)(pEproc + PPEB_OFFSET);
+
         KeReleaseGuardedMutex(&CallbacksMutex);
 
-        KdPrintError("TRACKING CR3: 0x%llx\n", LogCpuidProcessCr3);
+        KdPrintError("TRACKING CR3: 0x%llx\n", CR3ToTrack.Flags);
     }
 }
 
@@ -70,14 +73,8 @@ CtrlLogCpuidForProcess (
         goto Exit;
     }
     
-    if (wcslen(pIoctlInfo->FilePath) > MAX_PATH_LENGTH)
-		/*
-		if (Rip < 0x7fffffffffff)
-		{
-			KdPrintError("Cr3: 0x%llx\n",
-				GuestCr3);
-		}*/
-
+    if (wcslen(pIoctlInfo->FilePath) > MAX_PATH_LENGTH ||
+        sizeof(pIoctlInfo->FilePath) != sizeof(ProcessName))
     {
         Status = STATUS_INVALID_PARAMETER;
         goto Exit;
@@ -89,7 +86,7 @@ CtrlLogCpuidForProcess (
         pIoctlInfo->FilePath
     );
 
-    /*
+    memcpy(ProcessName, pIoctlInfo->ProcessName, sizeof(ProcessName));
 
     // Next stage of validation/creation
     // Attempt to create a file with the name
@@ -133,14 +130,10 @@ CtrlLogCpuidForProcess (
 
         goto Exit;
     }
-    */
+
     KeAcquireGuardedMutex(&CallbacksMutex);
 
-    RtlCopyMemory(
-        &InfoIoctlCpuidProcess,
-        pIoctlInfo,
-        sizeof(INFO_IOCTL_CPUID_PROCESS)
-    );
+    CpuidLoggingInfo.FileHandle = FileHandle;
 
     KeReleaseGuardedMutex(&CallbacksMutex);
 

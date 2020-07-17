@@ -18,13 +18,13 @@ VmxVmExitHandler (
 	case VMX_EXIT_REASON_EXECUTE_CPUID:
 	{
 
-		UINT64 GuestCr3;
-		__vmx_vmread(VMCS_GUEST_CR3, &GuestCr3);
+		CR3 GuestCr3;
+		__vmx_vmread(VMCS_GUEST_CR3, &GuestCr3.Flags);
 
 		ULONG64 Rip;
 		__vmx_vmread(VMCS_GUEST_RIP, &Rip);
 
-		if ((GuestCr3 & ~0xfffULL) == LogCpuidProcessCr3)
+		if (GuestCr3.Flags == CpuidLoggingInfo.Cr3.Flags)
 		{
 			KdPrintError(
 				"Cpuid called for process with RAX: 0x%llx\n",
@@ -32,10 +32,12 @@ VmxVmExitHandler (
 			);
 
 			KeAcquireGuardedMutex(&CallbacksMutex);
+
 			pGPContext->Rax = 0;
 			pGPContext->Rbx = 0; 
 			pGPContext->Rcx = 0; 
 			pGPContext->Rdx = 0; 
+
 			KeReleaseGuardedMutex(&CallbacksMutex);
 		}
 		else
