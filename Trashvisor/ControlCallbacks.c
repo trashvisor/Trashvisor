@@ -32,13 +32,9 @@ CpuidLoggingProcessCallback (
         CR3 CR3ToTrack;
         CR3ToTrack.Flags = *(PULONG64)(pKproc + USER_DIRECTORY_TABLE_BASE_OFFSET);
 
-        KeAcquireGuardedMutex(&CallbacksMutex);
-
         CpuidLoggingInfo.ProcessId = ProcessId;
         CpuidLoggingInfo.Cr3 = CR3ToTrack;
         CpuidLoggingInfo.pPeb = *(PUINT64)(pEproc + PPEB_OFFSET);
-
-        KeReleaseGuardedMutex(&CallbacksMutex);
 
         KdPrintError("TRACKING CR3: 0x%llx\n", CR3ToTrack.Flags);
     }
@@ -131,11 +127,7 @@ CtrlLogCpuidForProcess (
         goto Exit;
     }
 
-    KeAcquireGuardedMutex(&CallbacksMutex);
-
     CpuidLoggingInfo.FileHandle = FileHandle;
-
-    KeReleaseGuardedMutex(&CallbacksMutex);
 
     Status = PsSetCreateProcessNotifyRoutineEx2(
         PsCreateProcessNotifySubsystems,

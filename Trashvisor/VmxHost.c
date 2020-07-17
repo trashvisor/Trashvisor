@@ -31,14 +31,10 @@ VmxVmExitHandler (
 				pGPContext->Rax
 			);
 
-			KeAcquireGuardedMutex(&CallbacksMutex);
-
 			pGPContext->Rax = 0;
 			pGPContext->Rbx = 0; 
 			pGPContext->Rcx = 0; 
 			pGPContext->Rdx = 0; 
-
-			KeReleaseGuardedMutex(&CallbacksMutex);
 		}
 		else
 		{
