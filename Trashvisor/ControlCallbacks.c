@@ -16,13 +16,6 @@ CpuidLoggingProcessCallback (
 
     PCHAR pKproc = (PCHAR)pEproc;
 
-    /*
-    KdPrintError(
-        "Creating process: %wZ\n",
-        pCreateInfo->CommandLine
-    );
-    */
-
     PWCHAR Found = wcsstr(
         pCreateInfo->CommandLine->Buffer,
         InfoIoctlCpuidProcess.ProcessName
@@ -31,14 +24,17 @@ CpuidLoggingProcessCallback (
     if (Found != NULL)
     {
         KdPrintError(
-            "Creating process: %wZ\n",
-            pCreateInfo->CommandLine
+            "Found process: %wZ => 0x%x\n",
+            pCreateInfo->CommandLine,
+            ProcessId
         );
 
         //__debugbreak();
-        // Assume that only one process will trigger this 
+
         KeAcquireGuardedMutex(&CallbacksMutex);
-        LogCpuidProcessCr3 = *(PULONG64)(pKproc + 0x28) & ~0xfffULL;
+        // Get UserDirectoryTableBase, introduced post-meltdown
+        // DirectoryTableBase is the Kernel Cr3
+        LogCpuidProcessCr3 = *(PULONG64)(pKproc + 0x280) & ~0xfffULL;
         KeReleaseGuardedMutex(&CallbacksMutex);
 
         KdPrintError("TRACKING CR3: 0x%llx\n", LogCpuidProcessCr3);
@@ -145,7 +141,6 @@ CtrlLogCpuidForProcess (
         pIoctlInfo,
         sizeof(INFO_IOCTL_CPUID_PROCESS)
     );
-
 
     KeReleaseGuardedMutex(&CallbacksMutex);
 

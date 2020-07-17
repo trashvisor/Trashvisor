@@ -14,4 +14,7 @@ typedef struct _INFO_IOCTL_CPUID_PROCESS
 {
     WCHAR ProcessName[MAX_PATH_LENGTH];
     WCHAR FilePath[MAX_PATH_LENGTH];
+    
+    //Value to spoof
+    UINT64 SpoofValue;
 } INFO_IOCTL_CPUID_PROCESS, *PINFO_IOCTL_CPUID_PROCESS;

@@ -24,26 +24,19 @@ VmxVmExitHandler (
 		ULONG64 Rip;
 		__vmx_vmread(VMCS_GUEST_RIP, &Rip);
 
-		if (Rip < 0x7fffffffffff)
-			KdPrintError(
-				"Cpuid called for process with Cr3: 0x%llx\n",
-				GuestCr3 & ~0xfffULL
-			);
-
-		// Spoof, not log lol
-		if (LogCpuidProcessCr3 == (GuestCr3 & ~0xfffULL))
+		if ((GuestCr3 & ~0xfffULL) == LogCpuidProcessCr3)
 		{
-			__debugbreak();
-
 			KdPrintError(
 				"Cpuid called for process with RAX: 0x%llx\n",
 				pGPContext->Rax
 			);
 
-			pGPContext->Rax = 0x100;
-			pGPContext->Rbx = 0x100;
-			pGPContext->Rcx = 0x100;
-			pGPContext->Rdx = 0x100;
+			KeAcquireGuardedMutex(&CallbacksMutex);
+			pGPContext->Rax = 0;
+			pGPContext->Rbx = 0; 
+			pGPContext->Rcx = 0; 
+			pGPContext->Rdx = 0; 
+			KeReleaseGuardedMutex(&CallbacksMutex);
 		}
 		else
 		{
