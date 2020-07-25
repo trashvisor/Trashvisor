@@ -1,6 +1,5 @@
 #include "ArchUtils.h"
 
-_Use_decl_annotations_
 BOOLEAN
 IsVmxSupported(
 )

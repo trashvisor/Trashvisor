@@ -106,6 +106,7 @@ SetupVmcsGuestState (
 	__vmx_vmwrite(VMCS_GUEST_VMCS_LINK_POINTER, ~0ULL);
 }
 
+_Use_decl_annotations_
 VOID
 SetupVmcsHostState (
 	PLOCAL_VMM_CONTEXT pLocalVmmContext
@@ -115,6 +116,9 @@ SetupVmcsHostState (
 	PMISC_CONTEXT pMiscContext = &pLocalVmmContext->MiscRegisterContext;
 
 	__vmx_vmwrite(VMCS_HOST_CR0, pMiscContext->Cr0.Flags);
+
+	KdPrintError("Writing to host cr3: 0x%llx\n", pLocalVmmContext->pGlobalVmmContext->SystemCr3.Flags);
+
 	__vmx_vmwrite(VMCS_HOST_CR3, pLocalVmmContext->pGlobalVmmContext->SystemCr3.Flags);
 	__vmx_vmwrite(VMCS_HOST_CR4, pMiscContext->Cr4.Flags);
 
@@ -220,6 +224,7 @@ SetupVmcsVmExitCtls (
 	__vmx_vmwrite(VMCS_CTRL_VMEXIT_MSR_LOAD_COUNT, 0);
 }
 
+_Use_decl_annotations_
 VOID
 SetupVmcsVmEntryCtls (
 	PLOCAL_VMM_CONTEXT pLocalVmmContext,

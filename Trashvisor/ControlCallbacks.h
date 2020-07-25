@@ -6,7 +6,8 @@ typedef struct _CPUID_LOGGING_INFO
 {
     HANDLE FileHandle;
     HANDLE ProcessId;
-    CR3 Cr3;
+    CR3 UserCr3;
+    CR3 KernelCr3;
     PPEB pPeb;
 } CPUID_LOGGING_INFO, *PCPUID_LOGGING_INFO;
 

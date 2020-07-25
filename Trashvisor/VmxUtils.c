@@ -57,7 +57,6 @@ Exit:
 	return pGlobalVmmContext;
 }
 
-_Must_inspect_result_
 _Use_decl_annotations_
 PLOCAL_VMM_CONTEXT
 AllocateLocalVmmContext (
@@ -103,7 +102,6 @@ Exit:
 	return pLocalVmmContext;
 }
 
-_Must_inspect_result_
 _Use_decl_annotations_
 PVMCS
 AllocateVmcs (
@@ -138,7 +136,6 @@ Exit:
 	return pVmcs;
 }
 
-_Must_inspect_result_
 _Use_decl_annotations_
 PVMXON
 AllocateVmxOn (
@@ -355,7 +352,7 @@ EnforceRequiredBits (
 	UINT32 Required0Bits = (RequiredBits & 0xFFFFFFFF);
 	UINT32 Allowed1Bits = ((RequiredBits >> 32) & 0xFFFFFFFF);
 
-	if (BitsToSet & Allowed1Bits != BitsToSet)
+	if ((BitsToSet & Allowed1Bits) != BitsToSet)
 		KdPrintError("Bits to set: %u\n Allowed bits: %u\n", BitsToSet, Allowed1Bits);
 
 	BitsToSet |= Required0Bits;

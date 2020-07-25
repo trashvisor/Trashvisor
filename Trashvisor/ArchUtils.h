@@ -1,6 +1,7 @@
 #pragma once
 #include "Extern.h"
 #include "Shared.h"
+#include <ntimage.h>
 
 typedef struct _SEGMENT_SETUP
 {
@@ -56,4 +57,40 @@ GetSysSegmentBase (
 
 VOID
 HypervisorLoop (
+);
+
+typedef struct _PEB_LDR_DATA
+{
+	UINT32		Length;
+	UCHAR		Initialised;
+	PVOID		SsHandle;
+	LIST_ENTRY	InLoadOrderModuleList;
+	LIST_ENTRY	InMemOrderModuleList;
+	LIST_ENTRY	InInitOrderModuleList;
+	PVOID		EntryInProgress;
+	UCHAR		ShutDownInProgress;
+	PVOID		ShutDownThreadId;
+} PEB_LDR_DATA, *PPEB_LDR_DATA;
+
+typedef struct _LDR_MODULE
+{
+	LIST_ENTRY              InLoadOrderModuleList;
+    LIST_ENTRY              InMemOrderModuleList;
+    LIST_ENTRY              InInitializationOrderModuleList;
+    PVOID                   BaseAddress;
+    PVOID                   EntryPoint;
+    ULONG                   SizeOfImage;
+    UNICODE_STRING          FullDllName;
+    UNICODE_STRING          BaseDllName;
+    ULONG                   Flags;
+    SHORT                   LoadCount;
+    SHORT                   TlsIndex;
+    LIST_ENTRY              HashTableEntry;
+    ULONG                   TimeDateStamp;
+} LDR_MODULE, *PLDR_MODULE;
+
+NTSYSAPI
+PIMAGE_NT_HEADERS
+RtlImageNtHeader (
+	_In_ PVOID BaseAddress
 );

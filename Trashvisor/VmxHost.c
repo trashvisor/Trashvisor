@@ -13,19 +13,25 @@ VmxVmExitHandler (
 	VMX_EXIT_REASON ExitReason;
 	__vmx_vmread(VMCS_EXIT_REASON, &ExitReason.Flags);
 
+    CR3 HostCr3;
+    __vmx_vmread(VMCS_HOST_CR3, &HostCr3.Flags);
+
 	switch (ExitReason.ExitReason)
 	{
 	case VMX_EXIT_REASON_EXECUTE_CPUID:
 	{
-
 		CR3 GuestCr3;
 		__vmx_vmread(VMCS_GUEST_CR3, &GuestCr3.Flags);
 
 		ULONG64 Rip;
 		__vmx_vmread(VMCS_GUEST_RIP, &Rip);
 
-		if (GuestCr3.Flags == CpuidLoggingInfo.Cr3.Flags)
+		if (GuestCr3.Flags == CpuidLoggingInfo.UserCr3.Flags)
 		{
+			__debugbreak();
+
+			__writecr3(CpuidLoggingInfo.KernelCr3.Flags);
+	
 			KdPrintError(
 				"Cpuid called for process with RAX: 0x%llx\n",
 				pGPContext->Rax
@@ -35,6 +41,70 @@ VmxVmExitHandler (
 			pGPContext->Rbx = 0; 
 			pGPContext->Rcx = 0; 
 			pGPContext->Rdx = 0; 
+			
+			PCHAR pPeb = (PCHAR)CpuidLoggingInfo.pPeb;
+
+			// Disable SMAP
+			CR4 Cr4;
+			Cr4.Flags = __readcr4();
+			Cr4.SmapEnable = 0;
+			__writecr4(Cr4.Flags);
+
+			PPEB_LDR_DATA pLdrData = *(PUINT64)(pPeb + 0x18);
+
+			PLIST_ENTRY FirstLink = &(pLdrData->InMemOrderModuleList);
+			PLIST_ENTRY CurrLink = FirstLink;
+
+			do 
+			{
+                PLDR_MODULE pCurrentModule = CONTAINING_RECORD(CurrLink->Flink, LDR_MODULE, InMemOrderModuleList.Flink);
+
+				KdPrintError("0x%llx\n", pCurrentModule->BaseAddress);
+
+				PVOID BaseAddress = pCurrentModule->BaseAddress;
+
+				PIMAGE_NT_HEADERS NtHeader = RtlImageNtHeader(BaseAddress);
+
+				UINT32 Size = NtHeader->OptionalHeader.SizeOfImage;
+
+				UINT_PTR BeginAddress = pCurrentModule->BaseAddress;
+				UINT_PTR EndAddress = BeginAddress + Size;
+
+				if (Rip >= BeginAddress && Rip <= EndAddress)
+				{
+					IO_STATUS_BLOCK StatusBlock;
+
+					ULONG32 RVA = Rip - BeginAddress;
+					
+					KdPrintError("Found cpuid call with RVA: 0x%x in: %wZ\n",
+						RVA,
+						pCurrentModule->BaseDllName);
+
+					CHAR Buffer[4];
+
+					memcpy(Buffer, &RVA, 4);
+
+					NTSTATUS Status = ZwWriteFile(
+						CpuidLoggingInfo.FileHandle,
+						NULL,
+						NULL,
+						NULL,
+						&StatusBlock,
+						Buffer,
+						sizeof(Buffer),
+						NULL,
+						NULL
+					);
+
+					if (!NT_SUCCESS(Status))
+						KdPrintError("ZwWriteFile failed with: 0x%x\n", Status);
+
+					break;
+				}
+
+				CurrLink = CurrLink->Flink;
+			} while (CurrLink->Flink != FirstLink);
+			
 		}
 		else
 		{
@@ -50,7 +120,7 @@ VmxVmExitHandler (
 	}
 	case VMX_EXIT_REASON_EXECUTE_RDMSR:
 	{
-		//GdbBreakPoint();
+		
 		ULONG64 Value = __readmsr(pGPContext->Rcx);
 		pGPContext->Rax = (Value) & 0xFFFFFFFF;
 		pGPContext->Rdx = (Value >> 32) & 0xFFFFFFFF;

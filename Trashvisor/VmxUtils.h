@@ -95,23 +95,28 @@ typedef union _VMCS_ACCESS_RIGHTS
 	UINT32 Flags;
 } VMCS_ACCESS_RIGHTS, *PVMCS_ACCESS_RIGHTS;
 
+_Must_inspect_result_
 PGLOBAL_VMM_CONTEXT
 AllocateGlobalVmmContext (
 );
 
+_Must_inspect_result_
 PLOCAL_VMM_CONTEXT
 AllocateLocalVmmContext (
 	_In_ PGLOBAL_VMM_CONTEXT pGlobalVmmContext
 );
 
+_Must_inspect_result_
 PVMCS
 AllocateVmcs (
 );
 
+_Must_inspect_result_
 PVMXON
 AllocateVmxOn (
 );
 
+_Must_inspect_result_
 PLOCAL_VMM_CONTEXT
 RetrieveLocalContext (
 	_In_ ULONG ProcessorNumber,
@@ -121,6 +126,11 @@ RetrieveLocalContext (
 VOID
 CaptureState (
 	_In_ PLOCAL_VMM_CONTEXT pLocalVmmContext
+);
+
+VOID
+CaptureMiscContext(
+	_In_ PMISC_CONTEXT pMiscContext
 );
 
 BOOLEAN
@@ -144,12 +154,12 @@ GetSysSegmentSetup (
 
 UINT32
 GetAccessRights (
-	SEGMENT_DESCRIPTOR_32 SegmentDesc
+	_In_ SEGMENT_DESCRIPTOR_32 SegmentDesc
 );
 
 UINT32
 GetSysAccessRights (
-	SEGMENT_DESCRIPTOR_64 SegmentDesc
+	_In_ SEGMENT_DESCRIPTOR_64 SegmentDesc
 );
 
 ULONG32

@@ -98,10 +98,11 @@ Exit:
 	return Status;
 }
 
+_Use_decl_annotations_
 NTSTATUS
 DriverDeviceCreate (
-	_In_ PDEVICE_OBJECT pDeviceObject,
-	_In_ PIRP pIrp
+	PDEVICE_OBJECT pDeviceObject,
+	PIRP pIrp
 )
 {
 	UNREFERENCED_PARAMETER(pDeviceObject);
@@ -113,10 +114,11 @@ DriverDeviceCreate (
 	return STATUS_SUCCESS;
 }
 
+_Use_decl_annotations_
 NTSTATUS
 DriverDeviceClose (
-	_In_ PDEVICE_OBJECT pDeviceObject,
-	_In_ PIRP pIrp
+	PDEVICE_OBJECT pDeviceObject,
+	PIRP pIrp
 )
 {
 	UNREFERENCED_PARAMETER(pDeviceObject);
@@ -128,10 +130,11 @@ DriverDeviceClose (
 	return STATUS_SUCCESS;
 }
 
+_Use_decl_annotations_
 NTSTATUS
 DriverDeviceCtrl (
-	_In_ PDEVICE_OBJECT pDeviceObject,
-	_In_ PIRP pIrp
+	PDEVICE_OBJECT pDeviceObject,
+	PIRP pIrp
 )
 {
 	PIO_STACK_LOCATION pIrpStack;

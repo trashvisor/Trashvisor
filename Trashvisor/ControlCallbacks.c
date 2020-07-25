@@ -1,6 +1,7 @@
 #include "ControlCallbacks.h"
 
 #define USER_DIRECTORY_TABLE_BASE_OFFSET 0x280
+#define DIRECTORY_TABLE_BASE_OFFSET 0x28
 #define PPEB_OFFSET 0x3f8
 
 KGUARDED_MUTEX CallbacksMutex = { 0 };
@@ -15,7 +16,12 @@ CpuidLoggingProcessCallback (
 )
 {
     if (pCreateInfo == NULL)
+    {
+        if (ProcessId == CpuidLoggingInfo.ProcessId)
+            ZwClose(CpuidLoggingInfo.FileHandle);
+
         return;
+    }
 
     PCHAR pKproc = (PCHAR)Eproc;
     PCHAR pEproc = (PCHAR)Eproc;
@@ -29,14 +35,19 @@ CpuidLoggingProcessCallback (
     {
         // Get UserDirectoryTableBase, introduced post-meltdown
         // DirectoryTableBase is the Kernel Cr3
-        CR3 CR3ToTrack;
-        CR3ToTrack.Flags = *(PULONG64)(pKproc + USER_DIRECTORY_TABLE_BASE_OFFSET);
+        CR3 Cr3ToTrack;
+        Cr3ToTrack.Flags = *(PULONG64)(pKproc + USER_DIRECTORY_TABLE_BASE_OFFSET);
+
+        CR3 KernelCr3;
+        KernelCr3.Flags = *(PULONG64)(pKproc + DIRECTORY_TABLE_BASE_OFFSET);
 
         CpuidLoggingInfo.ProcessId = ProcessId;
-        CpuidLoggingInfo.Cr3 = CR3ToTrack;
+        CpuidLoggingInfo.UserCr3 = Cr3ToTrack;
+        CpuidLoggingInfo.KernelCr3 = KernelCr3;
+       
         CpuidLoggingInfo.pPeb = *(PUINT64)(pEproc + PPEB_OFFSET);
 
-        KdPrintError("TRACKING CR3: 0x%llx\n", CR3ToTrack.Flags);
+        KdPrintError("Tracking CR3: 0x%llx\n", Cr3ToTrack.Flags);
     }
 }
 
@@ -103,31 +114,34 @@ CtrlLogCpuidForProcess (
 
     IO_STATUS_BLOCK IoStatusBlock;
 
-    Status = ZwCreateFile(
-        &FileHandle,
-        FILE_WRITE_DATA | FILE_READ_ACCESS,
-        &Oa,
-        &IoStatusBlock,
-        NULL,
-        FILE_ATTRIBUTE_NORMAL,
-        0,
-        FILE_OVERWRITE_IF,
-        FILE_NON_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_ALERT,
-        NULL,
-        0
-    );
-
-    if (!NT_SUCCESS(Status))
+    if (CpuidLoggingInfo.FileHandle != 0)
     {
-        KdPrintError(
-            "CtrlLogCpuidProcess: ZwCreateFile failed with: 0x%x\n",
-            Status
+        Status = ZwCreateFile(
+            &FileHandle,
+            FILE_WRITE_DATA | FILE_READ_ACCESS,
+            &Oa,
+            &IoStatusBlock,
+            NULL,
+            FILE_ATTRIBUTE_NORMAL,
+            0,
+            FILE_OVERWRITE_IF,
+            FILE_NON_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_ALERT,
+            NULL,
+            0
         );
 
-        goto Exit;
-    }
+        if (!NT_SUCCESS(Status))
+        {
+            KdPrintError(
+                "CtrlLogCpuidProcess: ZwCreateFile failed with: 0x%x\n",
+                Status
+            );
 
-    CpuidLoggingInfo.FileHandle = FileHandle;
+            goto Exit;
+        }
+
+        CpuidLoggingInfo.FileHandle = FileHandle;
+    }
 
     Status = PsSetCreateProcessNotifyRoutineEx2(
         PsCreateProcessNotifySubsystems,
