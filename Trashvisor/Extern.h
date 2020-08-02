@@ -2,7 +2,6 @@
 #include <ntddk.h>
 #include <intrin.h>
 #include <stdarg.h>
-
 #include <ia32.h>
 
 NTSYSAPI

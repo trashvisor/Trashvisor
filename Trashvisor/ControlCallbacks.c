@@ -5,7 +5,7 @@
 #define PPEB_OFFSET 0x3f8
 
 KGUARDED_MUTEX CallbacksMutex = { 0 };
-CPUID_LOGGING_INFO CpuidLoggingInfo = { 0 };
+PCPUID_LOGGING_INFO pCpuidLoggingInfo = NULL;
 WCHAR ProcessName[MAX_PATH_LENGTH];
 
 VOID
@@ -15,10 +15,53 @@ CpuidLoggingProcessCallback (
     PPS_CREATE_NOTIFY_INFO pCreateInfo
 )
 {
+    if (pCpuidLoggingInfo == NULL)
+        return;
+
     if (pCreateInfo == NULL)
     {
-        if (ProcessId == CpuidLoggingInfo.ProcessId)
-            ZwClose(CpuidLoggingInfo.FileHandle);
+        if (ProcessId != pCpuidLoggingInfo->ProcessId)
+            return;
+
+        __debugbreak();
+
+        for (int i = 0; i < pCpuidLoggingInfo->CurrentDataLine; i++)
+        {
+            CPUID_DATA_LINE DataLine = pCpuidLoggingInfo->LoggingData[i];
+
+            CHAR Buffer[sizeof(CPUID_DATA_LINE)];
+
+            RtlCopyMemory(
+                Buffer,
+                &DataLine,
+                sizeof(CPUID_DATA_LINE)
+            );
+
+            IO_STATUS_BLOCK IoStatusBlock;
+
+            NTSTATUS Status = ZwWriteFile(
+                pCpuidLoggingInfo->FileHandle,
+                NULL,
+                NULL,
+                NULL,
+                &IoStatusBlock,
+                Buffer,
+                sizeof(CPUID_DATA_LINE),
+                NULL,
+                NULL
+            );
+
+            if (!NT_SUCCESS(Status))
+            {
+                KdPrintError("Write failed.\n");
+            }
+        }
+
+        ZwClose(pCpuidLoggingInfo->FileHandle);
+
+        ExFreePoolWithTag(pCpuidLoggingInfo, 'DICP');
+
+        pCpuidLoggingInfo = NULL;
 
         return;
     }
@@ -41,11 +84,13 @@ CpuidLoggingProcessCallback (
         CR3 KernelCr3;
         KernelCr3.Flags = *(PULONG64)(pKproc + DIRECTORY_TABLE_BASE_OFFSET);
 
-        CpuidLoggingInfo.ProcessId = ProcessId;
-        CpuidLoggingInfo.UserCr3 = Cr3ToTrack;
-        CpuidLoggingInfo.KernelCr3 = KernelCr3;
+        PLIST_ENTRY Current = (PLIST_ENTRY)(pEproc + 0x488);
+
+        pCpuidLoggingInfo->ProcessId = ProcessId;
+        pCpuidLoggingInfo->UserCr3 = Cr3ToTrack;
+        pCpuidLoggingInfo->KernelCr3 = KernelCr3;
        
-        CpuidLoggingInfo.pPeb = *(PUINT64)(pEproc + PPEB_OFFSET);
+        pCpuidLoggingInfo->pPeb = (PPEB)*(PUINT64)(pEproc + PPEB_OFFSET);
 
         KdPrintError("Tracking CR3: 0x%llx\n", Cr3ToTrack.Flags);
     }
@@ -114,34 +159,53 @@ CtrlLogCpuidForProcess (
 
     IO_STATUS_BLOCK IoStatusBlock;
 
-    if (CpuidLoggingInfo.FileHandle != 0)
+    __debugbreak();
+
+    if (pCpuidLoggingInfo != NULL)
     {
-        Status = ZwCreateFile(
-            &FileHandle,
-            FILE_WRITE_DATA | FILE_READ_ACCESS,
-            &Oa,
-            &IoStatusBlock,
-            NULL,
-            FILE_ATTRIBUTE_NORMAL,
-            0,
-            FILE_OVERWRITE_IF,
-            FILE_NON_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_ALERT,
-            NULL,
-            0
+        ZwClose(pCpuidLoggingInfo->FileHandle);
+
+        ExFreePoolWithTag(pCpuidLoggingInfo, 'DICP');
+    }
+
+    pCpuidLoggingInfo = ExAllocatePoolWithTag(NonPagedPoolNx,
+        FIELD_OFFSET(CPUID_LOGGING_INFO, LoggingData[pIoctlInfo->LogCount]),
+        'DICP');
+
+    if (pCpuidLoggingInfo == NULL)
+    {
+        KdPrintError("CtrlLogCpuidForProcess: ExAllocatePoolWithTag could not allocate memory.\n");
+
+        goto Exit;
+    }
+
+    pCpuidLoggingInfo->CurrentDataLine = 0;
+
+    Status = ZwCreateFile(
+        &FileHandle,
+        FILE_WRITE_DATA | FILE_READ_ACCESS,
+        &Oa,
+        &IoStatusBlock,
+        NULL,
+        FILE_ATTRIBUTE_NORMAL,
+        0,
+        FILE_OVERWRITE_IF,
+        FILE_NON_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_ALERT,
+        NULL,
+        0
+    );
+
+    if (!NT_SUCCESS(Status))
+    {
+        KdPrintError(
+            "CtrlLogCpuidProcess: ZwCreateFile failed with: 0x%x\n",
+            Status
         );
 
-        if (!NT_SUCCESS(Status))
-        {
-            KdPrintError(
-                "CtrlLogCpuidProcess: ZwCreateFile failed with: 0x%x\n",
-                Status
-            );
-
-            goto Exit;
-        }
-
-        CpuidLoggingInfo.FileHandle = FileHandle;
+        goto Exit;
     }
+
+    pCpuidLoggingInfo->FileHandle = FileHandle;
 
     Status = PsSetCreateProcessNotifyRoutineEx2(
         PsCreateProcessNotifySubsystems,

@@ -56,7 +56,7 @@ GetSysSegmentBase (
 );
 
 VOID
-HypervisorLoop (
+HypervisorBreak (
 );
 
 typedef struct _PEB_LDR_DATA
@@ -89,8 +89,35 @@ typedef struct _LDR_MODULE
     ULONG                   TimeDateStamp;
 } LDR_MODULE, *PLDR_MODULE;
 
+typedef enum _KAPC_ENVIRONMENT
+{
+	OriginalApcEnvironment,
+	AttachedApcEnvironment,
+	CurrentApcEnvironment
+} KAPC_ENVIRONMENT, *PKAPC_ENVIRONMENT;
+
 NTSYSAPI
 PIMAGE_NT_HEADERS
 RtlImageNtHeader (
 	_In_ PVOID BaseAddress
+);
+
+NTSYSAPI
+VOID
+KeInitializeApc (
+	_In_ PKAPC pAPC,
+	_In_ PKTHREAD pThread,
+	_In_ KAPC_ENVIRONMENT TargetEnvironment,
+	_In_ PVOID KernelRoutine,
+	_In_ PVOID NormalRoutine,
+	_In_ KPROCESSOR_MODE ApcMode,
+	_In_ PVOID pNormalContext
+);
+
+NTSYSAPI
+KeInsertQueueApc (
+	_In_ PKAPC pAPC,
+	_In_ PVOID SystemArgument1,
+	_In_ PVOID SystemArgument2,
+	_In_ KPRIORITY Increment
 );

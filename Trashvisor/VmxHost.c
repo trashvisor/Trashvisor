@@ -13,36 +13,31 @@ VmxVmExitHandler (
 	VMX_EXIT_REASON ExitReason;
 	__vmx_vmread(VMCS_EXIT_REASON, &ExitReason.Flags);
 
-    CR3 HostCr3;
-    __vmx_vmread(VMCS_HOST_CR3, &HostCr3.Flags);
-
 	switch (ExitReason.ExitReason)
 	{
 	case VMX_EXIT_REASON_EXECUTE_CPUID:
 	{
+		if (pCpuidLoggingInfo == NULL)
+			goto IncrementRip;
+
 		CR3 GuestCr3;
 		__vmx_vmread(VMCS_GUEST_CR3, &GuestCr3.Flags);
 
 		ULONG64 Rip;
 		__vmx_vmread(VMCS_GUEST_RIP, &Rip);
 
-		if (GuestCr3.Flags == CpuidLoggingInfo.UserCr3.Flags)
+		if (GuestCr3.Flags == pCpuidLoggingInfo->UserCr3.Flags)
 		{
-			__debugbreak();
+			//__debugbreak();
 
-			__writecr3(CpuidLoggingInfo.KernelCr3.Flags);
+			__writecr3(pCpuidLoggingInfo->KernelCr3.Flags);
 	
 			KdPrintError(
 				"Cpuid called for process with RAX: 0x%llx\n",
 				pGPContext->Rax
 			);
-
-			pGPContext->Rax = 0;
-			pGPContext->Rbx = 0; 
-			pGPContext->Rcx = 0; 
-			pGPContext->Rdx = 0; 
 			
-			PCHAR pPeb = (PCHAR)CpuidLoggingInfo.pPeb;
+			PCHAR pPeb = (PCHAR)pCpuidLoggingInfo->pPeb;
 
 			// Disable SMAP
 			CR4 Cr4;
@@ -55,15 +50,14 @@ VmxVmExitHandler (
 			PLIST_ENTRY FirstLink = &(pLdrData->InMemOrderModuleList);
 			PLIST_ENTRY CurrLink = FirstLink;
 
+			CPUID_DATA_LINE DataLine;
+
 			do 
 			{
+				__debugbreak();
                 PLDR_MODULE pCurrentModule = CONTAINING_RECORD(CurrLink->Flink, LDR_MODULE, InMemOrderModuleList.Flink);
 
-				KdPrintError("0x%llx\n", pCurrentModule->BaseAddress);
-
-				PVOID BaseAddress = pCurrentModule->BaseAddress;
-
-				PIMAGE_NT_HEADERS NtHeader = RtlImageNtHeader(BaseAddress);
+				PIMAGE_NT_HEADERS NtHeader = RtlImageNtHeader(pCurrentModule->BaseAddress);
 
 				UINT32 Size = NtHeader->OptionalHeader.SizeOfImage;
 
@@ -72,39 +66,30 @@ VmxVmExitHandler (
 
 				if (Rip >= BeginAddress && Rip <= EndAddress)
 				{
-					IO_STATUS_BLOCK StatusBlock;
+					DataLine.CpuidRax = pGPContext->Rax;
+					DataLine.CpuidModuleRva = Rip - BeginAddress;
 
-					ULONG32 RVA = Rip - BeginAddress;
+					RtlCopyMemory(
+						DataLine.ModuleName,
+						pCurrentModule->BaseDllName.Buffer,
+						pCurrentModule->BaseDllName.Length
+					);
 					
 					KdPrintError("Found cpuid call with RVA: 0x%x in: %wZ\n",
-						RVA,
+						Rip - BeginAddress,
 						pCurrentModule->BaseDllName);
 
-					CHAR Buffer[4];
-
-					memcpy(Buffer, &RVA, 4);
-
-					NTSTATUS Status = ZwWriteFile(
-						CpuidLoggingInfo.FileHandle,
-						NULL,
-						NULL,
-						NULL,
-						&StatusBlock,
-						Buffer,
-						sizeof(Buffer),
-						NULL,
-						NULL
-					);
-
-					if (!NT_SUCCESS(Status))
-						KdPrintError("ZwWriteFile failed with: 0x%x\n", Status);
+					pCpuidLoggingInfo->LoggingData[pCpuidLoggingInfo->CurrentDataLine++] = DataLine;
 
 					break;
 				}
 
 				CurrLink = CurrLink->Flink;
+
 			} while (CurrLink->Flink != FirstLink);
-			
+
+            Cr4.SmapEnable = 1;
+            __writecr4(Cr4.Flags);
 		}
 		else
 		{

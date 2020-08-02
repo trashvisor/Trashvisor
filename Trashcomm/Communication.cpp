@@ -9,13 +9,6 @@ int main(
     char *Argv[]
 )
 {
-    srand(time(NULL));
-
-    UINT64 SpoofRegisterVal = 0;
-
-    if (Argc == 1)
-        SpoofRegisterVal = rand();
-
     auto Handle = CreateFileW(
         WIN32_DEVICE_NAME,
         GENERIC_READ | GENERIC_WRITE,
@@ -43,7 +36,7 @@ int main(
     auto ProcName = L"Project1.exe";
     wmemcpy(InfoIoctl.FilePath, FilePath, std::char_traits<wchar_t>::length(FilePath));
     wmemcpy(InfoIoctl.ProcessName, ProcName, std::char_traits<wchar_t>::length(ProcName));
-    InfoIoctl.SpoofValue = SpoofRegisterVal;
+    InfoIoctl.LogCount = 100;
 
     DWORD BytesReturned;
 
