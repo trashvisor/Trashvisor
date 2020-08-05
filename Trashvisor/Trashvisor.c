@@ -12,166 +12,166 @@ PGLOBAL_VMM_CONTEXT pGlobalVmmContext;
 
 NTSTATUS
 DriverEntry (
-	_In_ PDRIVER_OBJECT pDriverObject,
-	_In_ PUNICODE_STRING RegistryPath
+    _In_ PDRIVER_OBJECT pDriverObject,
+    _In_ PUNICODE_STRING RegistryPath
 )
 {
-	UNREFERENCED_PARAMETER(RegistryPath);
+    UNREFERENCED_PARAMETER(RegistryPath);
 
-	NTSTATUS Status = STATUS_SUCCESS;
+    NTSTATUS Status = STATUS_SUCCESS;
 
-	UNICODE_STRING NtDeviceName;
-	UNICODE_STRING DosDeviceLinkName;
+    UNICODE_STRING NtDeviceName;
+    UNICODE_STRING DosDeviceLinkName;
 
-	KeInitializeGuardedMutex(&CallbacksMutex);
+    KeInitializeGuardedMutex(&CallbacksMutex);
 
-	pDriverObject->MajorFunction[IRP_MJ_CREATE] = DriverDeviceCreate;
-	pDriverObject->MajorFunction[IRP_MJ_CLOSE] = DriverDeviceClose;
-	pDriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = DriverDeviceCtrl;
-	pDriverObject->DriverUnload = DriverUnload;
+    pDriverObject->MajorFunction[IRP_MJ_CREATE] = DriverDeviceCreate;
+    pDriverObject->MajorFunction[IRP_MJ_CLOSE] = DriverDeviceClose;
+    pDriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = DriverDeviceCtrl;
+    pDriverObject->DriverUnload = DriverUnload;
 
-	if (!IsVmxSupported())
-	{
-		Status = STATUS_UNSUCCESSFUL;
-		goto Exit;
-	}
-	
-	pGlobalVmmContext = AllocateGlobalVmmContext();
+    if (!IsVmxSupported())
+    {
+        Status = STATUS_UNSUCCESSFUL;
+        goto Exit;
+    }
 
-	if (pGlobalVmmContext == NULL)
-	{
-		Status = STATUS_UNSUCCESSFUL;
-		goto Exit;
-	}
+    pGlobalVmmContext = AllocateGlobalVmmContext();
 
-	KeGenericCallDpc(
-		VmxBroadcastInit,
-		pGlobalVmmContext
-	);
+    if (pGlobalVmmContext == NULL)
+    {
+        Status = STATUS_UNSUCCESSFUL;
+        goto Exit;
+    }
 
-	if (pGlobalVmmContext->ActivatedProcessorCount != 
-		pGlobalVmmContext->LogicalProcessorCount)
-	{
-		Status = STATUS_UNSUCCESSFUL;
-		goto Exit;
-	}
+    KeGenericCallDpc(
+        VmxBroadcastInit,
+        pGlobalVmmContext
+    );
 
-	KdPrintError("Successfully hypervised!\n");
+    if (pGlobalVmmContext->ActivatedProcessorCount !=
+        pGlobalVmmContext->LogicalProcessorCount)
+    {
+        Status = STATUS_UNSUCCESSFUL;
+        goto Exit;
+    }
 
-	RtlInitUnicodeString(&NtDeviceName, NT_DEVICE_NAME);
+    KdPrintError("Successfully hypervised!\n");
 
-	PDEVICE_OBJECT pTvDevice;
+    RtlInitUnicodeString(&NtDeviceName, NT_DEVICE_NAME);
 
-	Status = IoCreateDevice(
-		pDriverObject,
-		0,
-		&NtDeviceName,
-		FILE_DEVICE_UNKNOWN,
-		FILE_DEVICE_SECURE_OPEN,
-		FALSE,
-		&pTvDevice
-	);
+    PDEVICE_OBJECT pTvDevice;
 
-	if (!NT_SUCCESS(Status))
-	{
-		KdPrintError("Failed to create device. Error code: %d\n",
-			Status
-		);
+    Status = IoCreateDevice(
+        pDriverObject,
+        0,
+        &NtDeviceName,
+        FILE_DEVICE_UNKNOWN,
+        FILE_DEVICE_SECURE_OPEN,
+        FALSE,
+        &pTvDevice
+    );
 
-		goto Exit;
-	}
+    if (!NT_SUCCESS(Status))
+    {
+        KdPrintError("Failed to create device. Error code: %d\n",
+            Status
+        );
 
-	RtlInitUnicodeString(&DosDeviceLinkName, DOS_DEVICE_NAME);
+        goto Exit;
+    }
 
-	Status = IoCreateSymbolicLink(&DosDeviceLinkName, &NtDeviceName);
+    RtlInitUnicodeString(&DosDeviceLinkName, DOS_DEVICE_NAME);
 
-	if (!NT_SUCCESS(Status))
-	{
-		KdPrintError("Failed to create symbolic link. Error code: %d.\n",
-			Status
-		);
-		
-		goto Exit;
-	}
+    Status = IoCreateSymbolicLink(&DosDeviceLinkName, &NtDeviceName);
+
+    if (!NT_SUCCESS(Status))
+    {
+        KdPrintError("Failed to create symbolic link. Error code: %d.\n",
+            Status
+        );
+
+        goto Exit;
+    }
 
 Exit:
-	return Status;
+    return Status;
 }
 
 _Use_decl_annotations_
 NTSTATUS
 DriverDeviceCreate (
-	PDEVICE_OBJECT pDeviceObject,
-	PIRP pIrp
+    PDEVICE_OBJECT pDeviceObject,
+    PIRP pIrp
 )
 {
-	UNREFERENCED_PARAMETER(pDeviceObject);
-	
-	pIrp->IoStatus.Status = STATUS_SUCCESS;
-	pIrp->IoStatus.Information = 0;
-	IoCompleteRequest(pIrp, IO_NO_INCREMENT);
+    UNREFERENCED_PARAMETER(pDeviceObject);
 
-	return STATUS_SUCCESS;
+    pIrp->IoStatus.Status = STATUS_SUCCESS;
+    pIrp->IoStatus.Information = 0;
+    IoCompleteRequest(pIrp, IO_NO_INCREMENT);
+
+    return STATUS_SUCCESS;
 }
 
 _Use_decl_annotations_
 NTSTATUS
 DriverDeviceClose (
-	PDEVICE_OBJECT pDeviceObject,
-	PIRP pIrp
+    PDEVICE_OBJECT pDeviceObject,
+    PIRP pIrp
 )
 {
-	UNREFERENCED_PARAMETER(pDeviceObject);
+    UNREFERENCED_PARAMETER(pDeviceObject);
 
-	pIrp->IoStatus.Status = STATUS_SUCCESS;
-	pIrp->IoStatus.Information = 0;
-	IoCompleteRequest(pIrp, IO_NO_INCREMENT);
+    pIrp->IoStatus.Status = STATUS_SUCCESS;
+    pIrp->IoStatus.Information = 0;
+    IoCompleteRequest(pIrp, IO_NO_INCREMENT);
 
-	return STATUS_SUCCESS;
+    return STATUS_SUCCESS;
 }
 
 _Use_decl_annotations_
 NTSTATUS
 DriverDeviceCtrl (
-	PDEVICE_OBJECT pDeviceObject,
-	PIRP pIrp
+    PDEVICE_OBJECT pDeviceObject,
+    PIRP pIrp
 )
 {
-	PIO_STACK_LOCATION pIrpStack;
-	ULONG Ioctl;
-	NTSTATUS Status = STATUS_SUCCESS;
+    PIO_STACK_LOCATION pIrpStack;
+    ULONG Ioctl;
+    NTSTATUS Status = STATUS_SUCCESS;
 
-	pIrpStack = IoGetCurrentIrpStackLocation(pIrp);
-	Ioctl = pIrpStack->Parameters.DeviceIoControl.IoControlCode;
+    pIrpStack = IoGetCurrentIrpStackLocation(pIrp);
+    Ioctl = pIrpStack->Parameters.DeviceIoControl.IoControlCode;
 
-	//__debugbreak();
+    //__debugbreak();
 
-	switch (Ioctl)
-	{
-	case IOCTL_LOG_CPUID_PROCESS:
-		Status = CtrlLogCpuidForProcess(pDeviceObject, pIrp);
-		break;
-	default:
-		KdPrintError("DriverDeviceCtrl: Uknown case.\n");
-		Status = STATUS_UNSUCCESSFUL;
-		break;
-	}
+    switch (Ioctl)
+    {
+    case IOCTL_LOG_CPUID_PROCESS:
+        Status = CtrlLogCpuidForProcess(pDeviceObject, pIrp);
+        break;
+    default:
+        KdPrintError("DriverDeviceCtrl: Uknown case.\n");
+        Status = STATUS_UNSUCCESSFUL;
+        break;
+    }
 
-	pIrp->IoStatus.Status = Status;
-	pIrp->IoStatus.Information = 0;
+    pIrp->IoStatus.Status = Status;
+    pIrp->IoStatus.Information = 0;
 
-	IoCompleteRequest(pIrp, IO_NO_INCREMENT);
+    IoCompleteRequest(pIrp, IO_NO_INCREMENT);
 
-	return Status;
+    return Status;
 }
 
-VOID 
+VOID
 DriverUnload (
-	_In_ PDRIVER_OBJECT pDriverObject
+    _In_ PDRIVER_OBJECT pDriverObject
 )
 {
-	KeGenericCallDpc(
-		VmxBroadcastTeardown,
-		pGlobalVmmContext
-	);
+    KeGenericCallDpc(
+        VmxBroadcastTeardown,
+        pGlobalVmmContext
+    );
 }

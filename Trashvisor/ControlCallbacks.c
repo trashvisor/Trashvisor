@@ -89,8 +89,8 @@ CpuidLoggingProcessCallback (
         pCpuidLoggingInfo->ProcessId = ProcessId;
         pCpuidLoggingInfo->UserCr3 = Cr3ToTrack;
         pCpuidLoggingInfo->KernelCr3 = KernelCr3;
-       
-        pCpuidLoggingInfo->pPeb = (PPEB)*(PUINT64)(pEproc + PPEB_OFFSET);
+
+        pCpuidLoggingInfo->pPeb = (PPEB) * (PUINT64)(pEproc + PPEB_OFFSET);
 
         KdPrintError("Tracking CR3: 0x%llx\n", Cr3ToTrack.Flags);
     }
@@ -106,7 +106,7 @@ CtrlLogCpuidForProcess (
 
     PIO_STACK_LOCATION pIrpStack = IoGetCurrentIrpStackLocation(pIrp);
 
-    PINFO_IOCTL_CPUID_PROCESS pIoctlInfo = 
+    PINFO_IOCTL_CPUID_PROCESS pIoctlInfo =
         (PINFO_IOCTL_CPUID_PROCESS)pIrp->AssociatedIrp.SystemBuffer;
 
     UINT32 InputLength = pIrpStack->Parameters.DeviceIoControl.InputBufferLength;
@@ -124,14 +124,14 @@ CtrlLogCpuidForProcess (
         Status = STATUS_INVALID_PARAMETER;
         goto Exit;
     }
-    
+
     if (wcslen(pIoctlInfo->FilePath) > MAX_PATH_LENGTH ||
         sizeof(pIoctlInfo->FilePath) != sizeof(ProcessName))
     {
         Status = STATUS_INVALID_PARAMETER;
         goto Exit;
     }
-    
+
     KdPrintError(
         "Received: Process name => %S\nFile path => %S\n",
         pIoctlInfo->ProcessName,
