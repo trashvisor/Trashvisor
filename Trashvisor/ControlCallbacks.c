@@ -179,6 +179,7 @@ CtrlLogCpuidForProcess (
         goto Exit;
     }
 
+    pCpuidLoggingInfo->MaxLogCount = pIoctlInfo->LogCount;
     pCpuidLoggingInfo->CurrentDataLine = 0;
 
     Status = ZwCreateFile(

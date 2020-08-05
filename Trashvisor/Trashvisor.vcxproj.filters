@@ -45,6 +45,9 @@
     <ClCompile Include="ControlCallbacks.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="VmxHostExitHandlers.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="VmxUtils.h">

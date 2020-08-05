@@ -19,6 +19,7 @@ typedef struct _CPUID_LOGGING_INFO
     CR3 KernelCr3;
     PPEB pPeb;
     UINT32 CurrentDataLine;
+    UINT32 MaxLogCount;
     CPUID_DATA_LINE LoggingData[0];
 } CPUID_LOGGING_INFO, *PCPUID_LOGGING_INFO;
 
