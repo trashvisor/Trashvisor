@@ -97,63 +97,63 @@ typedef union _VMCS_ACCESS_RIGHTS
 
 _Must_inspect_result_
 PGLOBAL_VMM_CONTEXT
-AllocateGlobalVmmContext(
+AllocateGlobalVmmContext (
 );
 
 _Must_inspect_result_
 PLOCAL_VMM_CONTEXT
-AllocateLocalVmmContext(
+AllocateLocalVmmContext (
     _In_ PGLOBAL_VMM_CONTEXT pGlobalVmmContext
 );
 
 _Must_inspect_result_
 PVMCS
-AllocateVmcs(
+AllocateVmcs (
 );
 
 _Must_inspect_result_
 PVMXON
-AllocateVmxOn(
+AllocateVmxOn (
 );
 
 _Must_inspect_result_
 PLOCAL_VMM_CONTEXT
-RetrieveLocalContext(
+RetrieveLocalContext (
     _In_ ULONG ProcessorNumber,
     _In_ PGLOBAL_VMM_CONTEXT pGlobalVmmContext
 );
 
 VOID
-CaptureState(
+CaptureState (
     _In_ PLOCAL_VMM_CONTEXT pLocalVmmContext
 );
 
 VOID
-CaptureMiscContext(
+CaptureMiscContext (
     _In_ PMISC_CONTEXT pMiscContext
 );
 
 BOOLEAN
-EnableVmx(
+EnableVmx (
     _In_ PLOCAL_VMM_CONTEXT pLocalVmmContext
 );
 
 VOID
-GetSegmentSetup(
+GetSegmentSetup (
     _Out_ PSEGMENT_SETUP pSegmentSetup,
     _In_ UINT16 Selector,
     _In_ UINT64 GdtrBase
 );
 
 VOID
-GetSysSegmentSetup(
+GetSysSegmentSetup (
     _Out_ PSEGMENT_SETUP pSegmentSetup,
     _In_ UINT16 Selector,
     _In_ UINT64 GdtrBase
 );
 
 UINT32
-GetAccessRights(
+GetAccessRights (
     _In_ SEGMENT_DESCRIPTOR_32 SegmentDesc
 );
 

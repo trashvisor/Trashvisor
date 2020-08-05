@@ -7,24 +7,24 @@
 NTSYSAPI
 NTSTATUS
 KeGenericCallDpc (
-	_In_ PKDEFERRED_ROUTINE Routine,
-	_In_ PVOID  pContext
+    _In_ PKDEFERRED_ROUTINE Routine,
+    _In_ PVOID  pContext
 );
 
 NTSYSAPI
 VOID
 KeSignalCallDpcDone (
-	_In_ PVOID SystemArgument1
+    _In_ PVOID SystemArgument1
 );
 
 NTSYSAPI
 LOGICAL
 KeSignalCallDpcSynchronize (
-	_In_ PVOID SystemArgument2
+    _In_ PVOID SystemArgument2
 );
 
 NTSYSAPI
 VOID
 RtlCaptureContext(
-	_Out_ PCONTEXT ContextRecord
+    _Out_ PCONTEXT ContextRecord
 );

@@ -1,40 +1,40 @@
 #include "ArchUtils.h"
 
 BOOLEAN
-IsVmxSupported(
+IsVmxSupported (
 )
 {
-	BOOLEAN bStatus = TRUE;
+    BOOLEAN bStatus = TRUE;
 
-	int CpuIdInfo[4];
-	__cpuid(CpuIdInfo, 1);
+    int CpuIdInfo[4];
+    __cpuid(CpuIdInfo, 1);
 
-	if (!(CpuIdInfo[3] & (1 << 5)))
-	{
-		KdPrintError("Cpuid: Vmx not supported.\n");
-		bStatus = FALSE;
-		goto Exit;
-	}
+    if (!(CpuIdInfo[3] & (1 << 5)))
+    {
+        KdPrintError("Cpuid: Vmx not supported.\n");
+        bStatus = FALSE;
+        goto Exit;
+    }
 
-	IA32_FEATURE_CONTROL_REGISTER FeatureControlMsr;
-	FeatureControlMsr.Flags = ReadMsr(IA32_FEATURE_CONTROL);
+    IA32_FEATURE_CONTROL_REGISTER FeatureControlMsr;
+    FeatureControlMsr.Flags = ReadMsr(IA32_FEATURE_CONTROL);
 
-	if (!FeatureControlMsr.EnableVmxOutsideSmx)
-	{
-		KdPrintError("Vmx not enabled outside of SMX.\n");
-		bStatus = FALSE;
-		goto Exit;
-	}
+    if (!FeatureControlMsr.EnableVmxOutsideSmx)
+    {
+        KdPrintError("Vmx not enabled outside of SMX.\n");
+        bStatus = FALSE;
+        goto Exit;
+    }
 
-	if (!FeatureControlMsr.LockBit)
-	{
-		KdPrintError("Lock bit not set.\n");
-		bStatus = FALSE;
-		goto Exit;
-	}
+    if (!FeatureControlMsr.LockBit)
+    {
+        KdPrintError("Lock bit not set.\n");
+        bStatus = FALSE;
+        goto Exit;
+    }
 
 Exit:
-	return bStatus;
+    return bStatus;
 }
 
 _Use_decl_annotations_
@@ -54,58 +54,58 @@ KdPrintError (
 
 _Use_decl_annotations_
 ULONGLONG
-ReadMsr(
-	ULONG Msr	
+ReadMsr (
+    ULONG Msr
 )
 {
-	return __readmsr(Msr);
+    return __readmsr(Msr);
 }
 
 _Use_decl_annotations_
 SEGMENT_DESCRIPTOR_32
 GetSegmentDescriptor (
-	_In_ UINT16 Selector,
-	_In_ UINT64 GdtrBase
+    _In_ UINT16 Selector,
+    _In_ UINT64 GdtrBase
 )
 {
-	SEGMENT_DESCRIPTOR_32 Descriptor = *(PSEGMENT_DESCRIPTOR_32)(GdtrBase + (Selector & ~0b111));
-	return Descriptor;
+    SEGMENT_DESCRIPTOR_32 Descriptor = *(PSEGMENT_DESCRIPTOR_32)(GdtrBase + (Selector & ~0b111));
+    return Descriptor;
 }
 
 _Use_decl_annotations_
 SEGMENT_DESCRIPTOR_64
 GetSysSegmentDescriptor (
-	_In_ UINT16 Selector,
-	_In_ UINT64 GdtrBase
+    _In_ UINT16 Selector,
+    _In_ UINT64 GdtrBase
 )
 {
-	SEGMENT_DESCRIPTOR_64 Descriptor = *(PSEGMENT_DESCRIPTOR_64)(GdtrBase + (Selector & ~0b111));
-	return Descriptor;
+    SEGMENT_DESCRIPTOR_64 Descriptor = *(PSEGMENT_DESCRIPTOR_64)(GdtrBase + (Selector & ~0b111));
+    return Descriptor;
 }
 
 _Use_decl_annotations_
 UINT32
 GetSegmentBase (
-	_In_ SEGMENT_DESCRIPTOR_32 Segment
+    _In_ SEGMENT_DESCRIPTOR_32 Segment
 )
 {
-	return Segment.BaseAddressHigh << 24
-		| Segment.BaseAddressMiddle << 16
-		| Segment.BaseAddressLow;
+    return Segment.BaseAddressHigh << 24
+        | Segment.BaseAddressMiddle << 16
+        | Segment.BaseAddressLow;
 }
 
 _Use_decl_annotations_
 ULONG64
 GetSysSegmentBase (
-	_In_ SEGMENT_DESCRIPTOR_64 SysSegment
+    _In_ SEGMENT_DESCRIPTOR_64 SysSegment
 )
 {
-	ULONG64 BaseAddress = SysSegment.BaseAddressUpper;
-	BaseAddress <<= 32;
-	
-	BaseAddress |= (SysSegment.BaseAddressHigh << 24);
-	BaseAddress |= (SysSegment.BaseAddressMiddle << 16);
-	BaseAddress |= SysSegment.BaseAddressLow;
+    ULONG64 BaseAddress = SysSegment.BaseAddressUpper;
+    BaseAddress <<= 32;
 
-	return BaseAddress;
+    BaseAddress |= (SysSegment.BaseAddressHigh << 24);
+    BaseAddress |= (SysSegment.BaseAddressMiddle << 16);
+    BaseAddress |= SysSegment.BaseAddressLow;
+
+    return BaseAddress;
 }

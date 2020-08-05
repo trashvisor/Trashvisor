@@ -6,7 +6,7 @@
 
 int main(
     int Argc,
-    char *Argv[]
+    char* Argv[]
 )
 {
     auto Handle = CreateFileW(
@@ -51,11 +51,11 @@ int main(
         nullptr
     );
 
-    if (!Status) 
+    if (!Status)
     {
         std::cout << "DeviceIoControl failed. Error: " << "0x" << std::hex << GetLastError() << std::endl;
         return -1;
     }
-    
+
     return 0;
 }
