@@ -8,9 +8,9 @@ VmxSetupHostContext (
 )
 {
     __vmx_vmread(VMCS_GUEST_RSP, &pGPContext->Rsp);
-
     __vmx_vmread(VMCS_GUEST_CR3, &pExitContext->GuestCr3.Flags);
     __vmx_vmread(VMCS_GUEST_RIP, &pExitContext->GuestRip);
+    __vmx_vmread(VMCS_GUEST_PHYSICAL_ADDRESS, &pExitContext->GuestPhysicalAddress);
     __vmx_vmread(VMCS_VMEXIT_INSTRUCTION_LENGTH, &pExitContext->InstructionLength);
     __vmx_vmread(VMCS_EXIT_REASON, &pExitContext->ExitReason.Flags);
 
@@ -41,6 +41,19 @@ VmxHandleExitReason(
     {
         pExitContext->IncrementRip = TRUE;
         ExitHandleWrMsr(pExitContext, pGPContext);
+        break;
+    }
+    case VMX_EXIT_REASON_EXECUTE_INVEPT:
+    {
+        pExitContext->IncrementRip = TRUE;
+        ExitHandleInvept(pExitContext, pGPContext);
+        break;
+    }
+    case VMX_EXIT_REASON_EPT_VIOLATION:
+    {
+        //__debugbreak();
+        ExitHandleEptViolation(pExitContext, pGPContext);
+        //__debugbreak();
         break;
     }
     case VMX_EXIT_REASON_EXECUTE_VMCLEAR:

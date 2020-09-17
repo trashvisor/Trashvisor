@@ -25,6 +25,7 @@ typedef struct _VMM_EXIT_CONTEXT
     VMX_EXIT_REASON ExitReason;
     CR3				GuestCr3;
     UINT64			GuestRip;
+    UINT64          GuestPhysicalAddress;
     UINT32			InstructionLength;
     BOOLEAN			IncrementRip;
 } VMM_EXIT_CONTEXT, *PVMM_EXIT_CONTEXT;
@@ -40,6 +41,18 @@ VmxVmExitHandler (
 
 VOID
 ExitHandleCpuid (
+    _In_ PVMM_EXIT_CONTEXT pExitContext,
+    _In_ PVMM_GUEST_CONTEXT pGPContext
+);
+
+VOID
+ExitHandleInvept (
+    _In_ PVMM_EXIT_CONTEXT pExitContext,
+    _In_ PVMM_GUEST_CONTEXT pGPContext
+);
+
+VOID
+ExitHandleEptViolation (
     _In_ PVMM_EXIT_CONTEXT pExitContext,
     _In_ PVMM_GUEST_CONTEXT pGPContext
 );

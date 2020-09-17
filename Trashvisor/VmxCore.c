@@ -19,6 +19,8 @@ VmxBroadcastInit (
         pGlobalVmmContext
     );
 
+    ASSERT(pLocalVmmContext != NULL);
+
     // VmxInitialiseProcessor will set to FALSE if unsuccessful
     pLocalVmmContext->VmxActivated = TRUE;
 
@@ -46,9 +48,19 @@ VmxInitialiseProcessor (
 {
     if (!EnableVmx(pLocalVmmContext))
     {
-        KdPrintError("VmxInitialiseProcessor failed for processor %u.\n", KeGetCurrentProcessorNumber());
+        KdPrintError("VmxInitialiseProcessor failed for processor %u.\n", 
+            KeGetCurrentProcessorNumber());
         goto Exit;
     }
+
+    /*
+    if (!SetupEptp(pLocalVmmContext))
+    {
+        KdPrintError("VmxInitialiseProcessor: SetupEptp failed for processor %u.\n",
+            KeGetCurrentProcessorNumber());
+        goto Exit;
+    }
+    */
 
     CaptureState(pLocalVmmContext);
 

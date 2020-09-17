@@ -30,7 +30,7 @@ DriverEntry (
     pDriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = DriverDeviceCtrl;
     pDriverObject->DriverUnload = DriverUnload;
 
-    if (!IsVmxSupported())
+    if (!IsVmxSupported() || !IsEptSupported())
     {
         Status = STATUS_UNSUCCESSFUL;
         goto Exit;
@@ -41,6 +41,15 @@ DriverEntry (
     if (pGlobalVmmContext == NULL)
     {
         Status = STATUS_UNSUCCESSFUL;
+        goto Exit;
+    }
+
+    SetupContextEptInformation(pGlobalVmmContext);
+
+    if (!SetupEptp())
+    {
+        KdPrintError("VmxInitialiseProcessor: SetupEptp failed for processor %u.\n",
+            KeGetCurrentProcessorNumber());
         goto Exit;
     }
 
@@ -150,6 +159,9 @@ DriverDeviceCtrl (
     {
     case IOCTL_LOG_CPUID_PROCESS:
         Status = CtrlLogCpuidForProcess(pDeviceObject, pIrp);
+        break;
+    case IOCTL_ADD_EPT_HOOK:
+        Status = CtrlAddEptHook(pDeviceObject, pIrp);
         break;
     default:
         KdPrintError("DriverDeviceCtrl: Uknown case.\n");

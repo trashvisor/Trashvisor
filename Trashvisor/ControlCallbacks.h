@@ -1,3 +1,4 @@
+#pragma once
 #include "Extern.h"
 #include "Shared.h"
 #include "ArchUtils.h"
@@ -28,6 +29,12 @@ extern PCPUID_LOGGING_INFO pCpuidLoggingInfo;
 
 NTSTATUS
 CtrlLogCpuidForProcess (
+    PDEVICE_OBJECT pDeviceObject,
+    PIRP pIrp
+);
+
+NTSTATUS
+CtrlAddEptHook (
     PDEVICE_OBJECT pDeviceObject,
     PIRP pIrp
 );

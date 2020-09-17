@@ -48,6 +48,9 @@
     <ClCompile Include="VmxHostExitHandlers.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Ept.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="VmxUtils.h">
@@ -72,6 +75,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ControlCallbacks.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Ept.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

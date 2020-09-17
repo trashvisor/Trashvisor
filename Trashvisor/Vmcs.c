@@ -176,7 +176,8 @@ SetupVmcsExecutionCtls (
 
     ULONG32 ProcBasedCtls2Desired = IA32_VMX_PROCBASED_CTLS2_ENABLE_XSAVES_FLAG
         | IA32_VMX_PROCBASED_CTLS2_ENABLE_RDTSCP_FLAG
-        | IA32_VMX_PROCBASED_CTLS2_ENABLE_INVPCID_FLAG;
+        | IA32_VMX_PROCBASED_CTLS2_ENABLE_INVPCID_FLAG
+        | IA32_VMX_PROCBASED_CTLS2_ENABLE_EPT_FLAG;
 
     __vmx_vmwrite(VMCS_CTRL_PIN_BASED_VM_EXECUTION_CONTROLS,
         EnforceRequiredBits(PinBasedRegister.Flags, PinBasedCtlsDesired));
@@ -199,6 +200,8 @@ SetupVmcsExecutionCtls (
     __vmx_vmwrite(VMCS_CTRL_CR4_READ_SHADOW, pLocalVmmContext->MiscRegisterContext.Cr4.Flags);
 
     __vmx_vmwrite(VMCS_CTRL_MSR_BITMAP_ADDRESS, pLocalVmmContext->PhysMsrBitmap);
+
+    __vmx_vmwrite(VMCS_CTRL_EPT_POINTER, pGlobalVmmContext->EptPointer.Flags);
 }
 
 _Use_decl_annotations_

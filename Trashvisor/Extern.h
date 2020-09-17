@@ -1,5 +1,6 @@
 #pragma once
-#include <ntddk.h>
+//#include <ntddk.h>
+#include <ntifs.h>
 #include <intrin.h>
 #include <stdarg.h>
 #include <ia32.h>

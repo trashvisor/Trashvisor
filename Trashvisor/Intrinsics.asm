@@ -10,6 +10,21 @@ _sldt PROC
 	ret
 _sldt ENDP
 
+_cli PROC
+	cli
+	ret
+_cli ENDP
+
+_sti PROC
+	sti
+	ret
+_sti ENDP
+
+_invept PROC
+	invept rcx, OWORD PTR [rdx]
+	ret
+_invept ENDP
+
 HypervisorBreak PROC
 	pushfq
 	cli

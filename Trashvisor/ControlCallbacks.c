@@ -1,4 +1,6 @@
 #include "ControlCallbacks.h"
+#include "VmxUtils.h"
+#include "Ept.h"
 
 #define USER_DIRECTORY_TABLE_BASE_OFFSET 0x280
 #define DIRECTORY_TABLE_BASE_OFFSET 0x28
@@ -175,7 +177,6 @@ CtrlLogCpuidForProcess (
     if (pCpuidLoggingInfo == NULL)
     {
         KdPrintError("CtrlLogCpuidForProcess: ExAllocatePoolWithTag could not allocate memory.\n");
-
         goto Exit;
     }
 
@@ -222,6 +223,189 @@ CtrlLogCpuidForProcess (
             Status
         );
     }
+
+Exit:
+    return Status;
+}
+
+NTSTATUS
+CtrlAddEptHook (
+    PDEVICE_OBJECT pDeviceObject,
+    PIRP pIrp
+)
+{
+    //__debugbreak();
+
+    NTSTATUS Status = STATUS_SUCCESS;
+
+    PIO_STACK_LOCATION pIrpStack = IoGetCurrentIrpStackLocation(pIrp);
+    PINFO_IOCTL_EPT_HOOK_INFO pEptHookInfo = pIrp->AssociatedIrp.SystemBuffer;
+    ULONG64 BufferLength = pIrpStack->Parameters.DeviceIoControl.InputBufferLength;
+    PSYSTEM_PROCESS_INFORMATION pSystemProcessInfo = NULL;
+    PSYSTEM_PROCESS_INFORMATION CurrentEntry = NULL;
+
+    if (BufferLength < sizeof(INFO_IOCTL_EPT_HOOK_INFO))
+    {
+        Status = STATUS_BUFFER_OVERFLOW;
+        goto Exit;
+    }
+
+    ULONG ProcessInfoSize = 0;
+
+    Status = ZwQuerySystemInformation(
+        SystemProcessInformation,
+        pSystemProcessInfo,
+        0,
+        &ProcessInfoSize
+    );
+
+    // Force length mismatch to get the required size
+    if (Status != STATUS_INFO_LENGTH_MISMATCH)
+    {
+        KdPrintError(
+            "CtrlAddEptHook: ZwQuerySystemInformation failed with status 0x%x.\n",
+            Status
+        );
+        goto Exit;
+    }
+
+    pSystemProcessInfo = ExAllocatePoolWithTag(
+        NonPagedPoolNx,
+        2 * ProcessInfoSize,
+        'OFNI'
+    );
+    
+    Status = ZwQuerySystemInformation(
+        SystemProcessInformation,
+        pSystemProcessInfo,
+        2 * ProcessInfoSize,
+        NULL
+    );
+
+    if (!NT_SUCCESS(Status))
+    {
+        KdPrintError(
+            "CtrlAddEptHook: ZwQuerySystemInformation failed with status 0x%x.\n",
+            Status
+        );
+        goto Exit;
+    }
+
+    CurrentEntry = pSystemProcessInfo;
+    PCHAR pTargetEproc = NULL;
+
+    while (TRUE)
+    {
+        if (CurrentEntry->UniqueProcessId == 0)
+        {
+            CurrentEntry = (PSYSTEM_PROCESS_INFORMATION)
+                ((PCHAR)CurrentEntry + CurrentEntry->NextEntryOffset);
+            continue;
+        }
+
+        HANDLE ProcessHandle;
+        CLIENT_ID ClientId = { CurrentEntry->UniqueProcessId, NULL };
+        OBJECT_ATTRIBUTES ObjectAttributes;
+
+        InitializeObjectAttributes(
+            &ObjectAttributes,
+            NULL,
+            OBJ_KERNEL_HANDLE,
+            NULL,
+            NULL
+        );
+
+        Status = ZwOpenProcess(
+            &ProcessHandle,
+            PROCESS_ALL_ACCESS,
+            &ObjectAttributes,
+            &ClientId
+        );
+
+        if (!NT_SUCCESS(Status))
+        {
+            KdPrintError(
+                "CtrlAddEptHook: ZwOpenProcess failed with status 0x%x.\n",
+                Status
+            );
+            goto Exit;
+        }
+
+        PEPROCESS pEprocess;
+
+        Status = ObReferenceObjectByHandle(
+            ProcessHandle,
+            PROCESS_ALL_ACCESS,
+            *PsProcessType,
+            KernelMode,
+            &pEprocess,
+            NULL
+        );
+
+        if (!NT_SUCCESS(Status))
+        {
+            KdPrintError(
+                "CtrlAddEptHook: ObReferenceObjectByHandle failed with status 0x%x.\n",
+                Status
+            );
+            goto Exit;
+        }
+
+        PCHAR pProcessId = (PCHAR)pEprocess + 0x2e8;
+
+        UINT64 Pid;
+
+        RtlCopyMemory(
+            &Pid,
+            pProcessId,
+            sizeof(Pid)
+        );
+
+        if (Pid == pEptHookInfo->ProcessId)
+        {
+            KdPrintError("Found pid!\n");
+            //__debugbreak();
+            pTargetEproc = (PCHAR)pEprocess;
+            break;
+        }
+
+        if (CurrentEntry->NextEntryOffset == 0)
+            break;
+
+        CurrentEntry = (PSYSTEM_PROCESS_INFORMATION)
+            ((PCHAR)CurrentEntry + CurrentEntry->NextEntryOffset);
+    }
+
+    if (pTargetEproc == NULL)
+    {
+        KdPrintError("Could not find target pid.\n");
+        goto Exit;
+    }
+
+    UINT64 Dtb = *(PUINT64)(pTargetEproc + 0x28);
+    UINT64 StoredCr3 = __readcr3();
+
+    //HypervisorBreak();
+
+    KAPC_STATE ApcState;
+    KeStackAttachProcess((PRKPROCESS)pTargetEproc, &ApcState);
+
+    /*
+    _cli();
+    __writecr3(Dtb);
+    */
+
+    EptCreateHook(
+        pEptHookInfo->VirtualAddress,
+        pEptHookInfo->ModifiedPage
+    );
+
+    KeUnstackDetachProcess(&ApcState);
+
+    /*
+    __writecr3(StoredCr3);
+    _sti();
+    */
 
 Exit:
     return Status;

@@ -1,6 +1,5 @@
 #pragma once
-#include "Extern.h"
-#include "ArchUtils.h"
+#include "Ept.h"
 
 typedef VMXON* PVMXON;
 typedef struct _LOCAL_VMM_CONTEXT* PLOCAL_VMM_CONTEXT;
@@ -25,6 +24,9 @@ typedef struct _GLOBAL_VMM_CONTEXT
     ULONG LogicalProcessorCount;
     ULONG ActivatedProcessorCount;
     CR3 SystemCr3;
+    PEPT_REGION pEptRegion;
+    EPT_POINTER EptPointer;
+    EPT_MTRR_DESCRIPTOR EptMtrrDescriptors[8];
 } GLOBAL_VMM_CONTEXT, *PGLOBAL_VMM_CONTEXT;
 
 typedef struct _VMM_GUEST_CONTEXT
@@ -55,6 +57,9 @@ typedef struct _LOCAL_VMM_CONTEXT
 
     CONTEXT RegisterContext;
     MISC_CONTEXT MiscRegisterContext;
+
+    //PEPT_REGION pEptRegion;
+    //EPT_POINTER EptPointer;
 
     PVMXON pVmxOn;
     PVMCS pVmcs;

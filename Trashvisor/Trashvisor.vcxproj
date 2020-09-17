@@ -161,6 +161,7 @@
   <ItemGroup>
     <ClCompile Include="ArchUtils.c" />
     <ClCompile Include="ControlCallbacks.c" />
+    <ClCompile Include="Ept.c" />
     <ClCompile Include="Trashvisor.c" />
     <ClCompile Include="Vmcs.c" />
     <ClCompile Include="VmxCore.c" />
@@ -171,6 +172,7 @@
   <ItemGroup>
     <ClInclude Include="ArchUtils.h" />
     <ClInclude Include="ControlCallbacks.h" />
+    <ClInclude Include="Ept.h" />
     <ClInclude Include="Extern.h" />
     <ClInclude Include="Shared.h" />
     <ClInclude Include="Vmcs.h" />

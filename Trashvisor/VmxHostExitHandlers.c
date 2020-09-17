@@ -1,5 +1,6 @@
 #include "VmxHost.h"
 #include "ControlCallbacks.h"
+#include "Ept.h"
 
 _Use_decl_annotations_
 VOID
@@ -93,10 +94,66 @@ ExitHandleCpuid (
     }
 }
 
+_Use_decl_annotations_
+VOID
+ExitHandleInvept (
+    PVMM_EXIT_CONTEXT pExitContext,
+    PVMM_GUEST_CONTEXT pGPContext
+)
+{
+    _invept(pGPContext->Rcx, pGPContext->Rdx);
+}
+
+_Use_decl_annotations_
+VOID
+ExitHandleEptViolation (
+    PVMM_EXIT_CONTEXT pExitContext,
+    PVMM_GUEST_CONTEXT pGPContext
+)
+{
+    // Page align guest-rip
+    UINT64 PhysicalAddress = pExitContext->GuestPhysicalAddress & ~0xfffULL;
+
+    PEPT_HOOKED_ENTRY pHookedEntry = CONTAINING_RECORD(pGlobalVmmContext->pEptRegion->HookList.Flink, EPT_HOOKED_ENTRY, EptHookedListEntry);
+
+    PEPT_HOOKED_ENTRY pCurrEntry = pHookedEntry;
+
+    KdPrintError("Ept violation: Physical address => 0x%llx Guest ip => 0x%llx.\n", PhysicalAddress, pExitContext->GuestRip);
+
+    INT32 Found = 0;
+    do
+    {
+
+        KdPrintError("CurrEntry PhysBase => 0x%llx\n", pCurrEntry->PhysBaseAddress);
+
+        if (pCurrEntry->PhysBaseAddress == PhysicalAddress)
+        {
+            EPTE CurrentPte = *pCurrEntry->pPte;
+
+            // If we enabled X, then R/W are 0. So toggle.
+            if (CurrentPte.ExecuteAccess)
+                *pCurrEntry->pPte = pCurrEntry->NoExecuteEntry;
+            // If we have no X, then swap in the fake executable page.
+            else if (!CurrentPte.ExecuteAccess)
+                *pCurrEntry->pPte = pCurrEntry->ExecuteOnlyEntry;
+
+            KdPrintError("Replaced entry\n");
+            Found = 1;
+            break;
+        }
+
+        pCurrEntry = CONTAINING_RECORD(pCurrEntry->EptHookedListEntry.Flink, EPT_HOOKED_ENTRY, EptHookedListEntry);
+    } while (pCurrEntry != pHookedEntry);
+
+    if (!Found)
+        KdPrintError("Could not find entry for 0x%llx\n", PhysicalAddress);
+}
+
+_Use_decl_annotations_
 VOID
 ExitHandleRdMsr (
-    _In_ PVMM_EXIT_CONTEXT pExitContext,
-    _In_ PVMM_GUEST_CONTEXT pGPContext
+    PVMM_EXIT_CONTEXT pExitContext,
+    PVMM_GUEST_CONTEXT pGPContext
 )
 {
     ULONG64 Value = __readmsr(pGPContext->Rcx);
@@ -106,8 +163,8 @@ ExitHandleRdMsr (
 
 VOID
 ExitHandleWrMsr (
-    _In_ PVMM_EXIT_CONTEXT pExitContext,
-    _In_ PVMM_GUEST_CONTEXT pGPContext
+    PVMM_EXIT_CONTEXT pExitContext,
+    PVMM_GUEST_CONTEXT pGPContext
 )
 {
     ULONG64 Value = pGPContext->Rdx;
