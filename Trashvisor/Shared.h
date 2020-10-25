@@ -22,6 +22,7 @@ typedef struct _INFO_IOCTL_CPUID_PROCESS
 
 typedef struct _INFO_IOCTL_EPT_HOOK_INFO
 {
+    CHAR   OriginalPage[0x1000];
     CHAR   ModifiedPage[0x1000];
     UINT64 VirtualAddress;
     UINT64 ProcessId;

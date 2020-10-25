@@ -111,6 +111,8 @@ ExitHandleEptViolation (
     PVMM_GUEST_CONTEXT pGPContext
 )
 {
+    __debugbreak();
+
     // Page align guest-rip
     UINT64 PhysicalAddress = pExitContext->GuestPhysicalAddress & ~0xfffULL;
 
@@ -123,7 +125,6 @@ ExitHandleEptViolation (
     INT32 Found = 0;
     do
     {
-
         KdPrintError("CurrEntry PhysBase => 0x%llx\n", pCurrEntry->PhysBaseAddress);
 
         if (pCurrEntry->PhysBaseAddress == PhysicalAddress)
@@ -132,12 +133,75 @@ ExitHandleEptViolation (
 
             // If we enabled X, then R/W are 0. So toggle.
             if (CurrentPte.ExecuteAccess)
+            {
+                //__debugbreak();
                 *pCurrEntry->pPte = pCurrEntry->NoExecuteEntry;
+                KdPrintError("Replaced with R/W entry\n");
+            }
             // If we have no X, then swap in the fake executable page.
             else if (!CurrentPte.ExecuteAccess)
-                *pCurrEntry->pPte = pCurrEntry->ExecuteOnlyEntry;
+            {
+                //__debugbreak();
 
-            KdPrintError("Replaced entry\n");
+                /* SMC IS NOT SO EASY TO SUPPORT
+                * because im doing some slat stuff, and im playing around with smc on the page which im hooking, 
+                * everything works fine until i write to said page, then my hook doesnt hit anymore and i think its because the physical address of the page changes, 
+                * which is super weird to me cos its just some usermode page. 
+
+                * oh i guess after thinking about it a bit more, images are just section objects and the text section is probably marked cow 
+                * (since its not originally writeable) so that they can point to the same physical frame if multiple processes are spawned?
+                *
+                * to support it i guess i'd need to actually trap on accesses to the original pte, lol
+                */
+
+                /*
+                // Reflect writes to the page -- Account for self-modifying code 
+                CHAR CurrentPage[PAGE_SIZE];
+
+                // Disable SMAP
+                CR4 Cr4;
+                Cr4.Flags = __readcr4();
+                Cr4.SmapEnable = 0;
+                __writecr4(Cr4.Flags);
+
+                PHYSICAL_ADDRESS PA;
+                PA.QuadPart = PhysicalAddress;
+
+                // Swap in the kernel's DTB so we can access the user mode address space.
+                __writecr3(pCurrEntry->ProcessKernelCr3.Flags);
+
+                PVOID VirtualAddress = (PVOID)pCurrEntry->VirtBaseAddress;
+
+                if (VirtualAddress == NULL)
+                {
+                    KdPrintError("VirtualAddress for physical address 0x%llx was 0\n", PhysicalAddress);
+                    //__debugbreak();
+                }
+
+                RtlCopyMemory(
+                    CurrentPage,
+                    VirtualAddress,
+                    PAGE_SIZE
+                );
+
+                // Re-enable SMAP
+                Cr4.SmapEnable = 1;
+                __writecr4(Cr4.Flags);
+
+                // Find any differences between the original page and current page
+                for (int i = 0; i < PAGE_SIZE; i++)
+                {
+                    if (CurrentPage[i] != pCurrEntry->OriginalPage[i])
+                    {
+                        // Reflect changes to the X page
+                        pCurrEntry->FakePage[i] = CurrentPage[i];
+                    }
+                }
+                */
+                *pCurrEntry->pPte = pCurrEntry->ExecuteOnlyEntry;
+                KdPrintError("Replaced with X entry\n");
+            }
+
             Found = 1;
             break;
         }

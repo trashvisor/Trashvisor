@@ -252,7 +252,9 @@ _Use_decl_annotations_
 BOOLEAN
 EptCreateHook (
     UINT64 VirtualAddress,
-    PCHAR FakePage
+    PCHAR FakePage,
+    PCHAR OriginalPage,
+    PEPROCESS pTargetEproc
 )
 {
     BOOLEAN Status = TRUE;
@@ -308,6 +310,7 @@ EptCreateHook (
     PEPTE pPageTable = MmGetVirtualForPhysical(PhysAddr);
     PEPTE pOriginalEntry = &pPageTable[PtIndex];
 
+    pEptHookedEntry->VirtBaseAddress = VirtualAddress;
     pEptHookedEntry->PhysBaseAddress = PhysicalAddress;
 
     pEptHookedEntry->pPte = pOriginalEntry;
@@ -331,6 +334,16 @@ EptCreateHook (
         FakePage,
         PAGE_SIZE
     );
+
+    RtlCopyMemory(
+        pEptHookedEntry->OriginalPage,
+        OriginalPage,
+        PAGE_SIZE
+    );
+
+    PCHAR pEprocBytes = (PCHAR)pTargetEproc;
+
+    pEptHookedEntry->ProcessKernelCr3.Flags = *(PUINT64)(pEprocBytes + 0x28);
 
     InsertHeadList(
         &pGlobalVmmContext->pEptRegion->HookList,

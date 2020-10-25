@@ -355,11 +355,16 @@ AddEptHook2 (
     auto ReadSuccess = ReadProcessMemory(
         ProcessHandle,
         pModuleAddress,
-        EptHookInfo.ModifiedPage,
-        sizeof EptHookInfo.ModifiedPage,
+        EptHookInfo.OriginalPage,
+        sizeof EptHookInfo.OriginalPage,
         &BytesRead
     );
 
+    RtlCopyMemory(
+        EptHookInfo.ModifiedPage,
+        EptHookInfo.OriginalPage,
+        0x1000
+    );
 
     if (!ReadSuccess)
     {
@@ -444,6 +449,195 @@ AddEptHook2 (
     return 1;
 }
 
+UINT64
+TestHook (
+)
+{
+    // Search through all processes
+    auto Pid = GetPidByName(L"Project1.exe");
+
+    if (Pid == -1)
+    {
+        std::cout << "Could not find pid for name" << std::endl;
+        return 0;
+    }
+
+    INFO_IOCTL_EPT_HOOK_INFO EptHookInfo;
+    EptHookInfo.ProcessId = Pid;
+    
+    std::cout << "Pid: " << Pid << std::endl;
+
+    auto ProcessHandle = OpenProcess(
+        PROCESS_ALL_ACCESS,
+        FALSE,
+        Pid
+    );
+
+    if (ProcessHandle == NULL)
+    {
+        std::cout << "Could not open process" << std::endl;
+        return 0;
+    }
+
+    DWORD SizeNeeded;
+    HMODULE Modules[50];
+
+    auto AcquiredModules = EnumProcessModules(
+        ProcessHandle,
+        Modules,
+        sizeof Modules,
+        &SizeNeeded
+    );
+
+    if (!AcquiredModules)
+    {
+        std::cout << "Could not acquire modules" << std::endl;
+        return 0;
+    }
+
+    if (SizeNeeded > sizeof Modules)
+    {
+        std::cout << "Size needed: " << SizeNeeded << std::endl;
+        return 0;
+    }
+
+    auto AcquiredCount = SizeNeeded / sizeof HMODULE;
+    std::cout << "Successfully acquired " << AcquiredCount << " modules" << std::endl;
+
+    UINT64 ModuleAddress = 0;
+
+    for (int i = 0; i < AcquiredCount; i++)
+    {
+        const auto& Module = Modules[i];
+        PCHAR ImageStart = 0;
+
+        RtlCopyMemory(
+            &ImageStart,
+            &Module,
+            sizeof Module
+        );
+        
+        std::cout << "Module at: 0x" << std::hex << reinterpret_cast<PVOID>(ImageStart) << std::endl;
+
+        CHAR Buffer[4];
+        SIZE_T SizeRead = 0;
+
+        auto ReadSuccess = ReadProcessMemory(
+            ProcessHandle,
+            ImageStart + 0x1000,
+            Buffer,
+            sizeof Buffer,
+            &SizeRead
+        );
+
+        if (!ReadSuccess)
+        {
+            std::cout << "ReadProcessMemory failed with: 0x" << std::hex << GetLastError() << std::endl;
+            return 0;
+        }
+
+        if (RtlCompareMemory(Buffer, "\x48\x83\xEC\x28", 4) == 4)
+        {
+            std::cout << "Found minigamz.exe module at 0x" << std::hex << reinterpret_cast<PVOID>(Module) << std::endl;
+
+            RtlCopyMemory(
+                &ModuleAddress,
+                &Module,
+                sizeof ModuleAddress
+            );
+
+            break;
+        }
+    }
+
+    if (ModuleAddress == 0)
+    {
+        std::cout << "Could not find minigamz.exe module" << std::endl;
+        return 0;
+    }
+
+    PCHAR pModuleAddress = 0;
+
+    ModuleAddress = (ModuleAddress + 0x4F000) & ~0xfffULL;
+
+    std::cout << "Aligned address: 0x" << std::hex << ModuleAddress << std::endl;
+
+    RtlCopyMemory(
+        &pModuleAddress,
+        &ModuleAddress,
+        sizeof pModuleAddress
+    );
+
+    SIZE_T BytesRead = 0;
+
+    auto ReadSuccess = ReadProcessMemory(
+        ProcessHandle,
+        pModuleAddress,
+        EptHookInfo.OriginalPage,
+        sizeof EptHookInfo.OriginalPage,
+        &BytesRead
+    );
+
+    RtlCopyMemory(
+        EptHookInfo.ModifiedPage,
+        EptHookInfo.OriginalPage,
+        0x1000
+    );
+
+    if (!ReadSuccess)
+    {
+        std::cout << "ReadProcessMemory failed on page: 0x" << std::hex << pModuleAddress << std::endl;
+        return 0;
+    }
+
+    EptHookInfo.ModifiedPage[0x3] = 0x90;
+
+    RtlCopyMemory(
+        &EptHookInfo.VirtualAddress,
+        &pModuleAddress,
+        sizeof EptHookInfo.VirtualAddress
+    );
+
+    auto DeviceHandle = CreateFileW(
+        WIN32_DEVICE_NAME,
+        GENERIC_READ | GENERIC_WRITE,
+        0,
+        nullptr,
+        OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL,
+        nullptr
+    );
+
+    if (DeviceHandle == INVALID_HANDLE_VALUE)
+    {
+        std::cout << "Could not open a handle to " << WIN32_DEVICE_NAME << std::endl;
+        return 0;
+    }
+
+    DWORD BytesReturned = 0;
+
+    Sleep(1000);
+    
+    auto IoCtrlStatus = DeviceIoControl(
+        DeviceHandle,
+        IOCTL_ADD_EPT_HOOK,
+        &EptHookInfo,
+        sizeof EptHookInfo,
+        nullptr,
+        0,
+        &BytesReturned,
+        nullptr
+    );
+    
+    if (!IoCtrlStatus)
+    {
+        std::cout << "DeviceIoControl failed with error: 0x" << std::hex << GetLastError() << std::endl;
+        return 0;
+    }
+
+    return 1;
+}
+
 int
 main (
     int Argc,
@@ -451,8 +645,10 @@ main (
 )
 {
 
-    AddEptHook();
-    AddEptHook2();
+    //AddEptHook();
+    //AddEptHook2();
+    TestHook();
+
     /*
     auto Handle = CreateFileW(
         WIN32_DEVICE_NAME,

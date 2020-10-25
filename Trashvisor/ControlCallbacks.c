@@ -397,7 +397,9 @@ CtrlAddEptHook (
 
     EptCreateHook(
         pEptHookInfo->VirtualAddress,
-        pEptHookInfo->ModifiedPage
+        pEptHookInfo->ModifiedPage,
+        pEptHookInfo->OriginalPage,
+        pTargetEproc
     );
 
     KeUnstackDetachProcess(&ApcState);

@@ -43,9 +43,12 @@ typedef struct _EPT_SPLIT_LARGE_PAGE
 
 typedef struct _EPT_HOOKED_ENTRY
 {
+    DECLSPEC_ALIGN(PAGE_SIZE) CHAR OriginalPage[PAGE_SIZE];
     DECLSPEC_ALIGN(PAGE_SIZE) CHAR FakePage[PAGE_SIZE];
     LIST_ENTRY EptHookedListEntry;
     UINT64 PhysBaseAddress;
+    UINT64 VirtBaseAddress;
+    CR3 ProcessKernelCr3;
 
     PEPTE pPte;
     EPTE  OriginalEntry;
@@ -85,7 +88,9 @@ SetupEptp (
 BOOLEAN
 EptCreateHook (
     _In_ UINT64 VirtualAddress,
-    _In_ PCHAR FakePage
+    _In_ PCHAR FakePage,
+    _In_ PCHAR OriginalPage,
+    _In_ PEPROCESS pTargetEproc
 );
 
 VOID
